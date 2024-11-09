@@ -1,0 +1,35 @@
+# Ignore the virtual environment folder
+venv/
+# or if your virtual environment has a different name, use that name
+# myenv/
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+
+# Ignore logs
+*.log
+
+# Ignore temporary files
+*.tmp
+temp/
+
+# Ignore environment variables file
+.env
+
+# Ignore IDE specific files
+.vscode/
+.idea/
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore build directories
+/dist/
+/build/
+
+# Ignore macOS specific files
+.DS_Store
+
+# Ignore Windows specific files
+Thumbs.db

@@ -1,20 +1,15 @@
 from pydantic import BaseModel
-from datetime import datetime
 
-class DocumentBase(BaseModel):
+class DocumentCreate(BaseModel):
     filename: str
 
-class DocumentCreate(DocumentBase):
-    pass
-
-class Document(DocumentBase):
+class QuestionRequest(BaseModel):
+    question: str
+    document_id: int
+    
+class DocumentResponse(BaseModel):
     id: int
-    upload_date: datetime
-    file_path: str
+    filename: str
 
     class Config:
         orm_mode = True
-
-class QuestionRequest(BaseModel):
-    document_id: int
-    question: str

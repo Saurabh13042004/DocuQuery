@@ -1,21 +1,73 @@
 import os
-from fastapi import UploadFile
-from pypdf import PdfReader
+import fitz  # PyMuPDF
+import google.generativeai as genai
+from dotenv import load_dotenv
 
-UPLOAD_DIR = "uploads"
+# Load environment variables from .env file
+load_dotenv()
 
-def save_uploaded_file(file: UploadFile) -> str:
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
-    
-    with open(file_path, "wb") as buffer:
-        buffer.write(file.file.read())
-    
-    return file_path
+# Configure the Gemini API key
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])  # Ensure this is set correctly
 
-def extract_text_from_pdf(file_path: str) -> str:
-    reader = PdfReader(file_path)
+async def save_pdf(file) -> str:
+    """
+    Saves the uploaded PDF file to the local filesystem.
+
+    Args:
+        file: The uploaded file object.
+
+    Returns:
+        str: The file path where the PDF is saved.
+    """
+    os.makedirs('pdfs', exist_ok=True)
+    file_location = f"pdfs/{file.filename}"
+    with open(file_location, "wb") as f:
+        f.write(await file.read())
+    return file_location
+
+async def extract_text_from_pdf(file_path: str) -> str:
+    """
+    Extracts text from a PDF file.
+
+    Args:
+        file_path (str): The path to the PDF file.
+
+    Returns:
+        str: The extracted text from the PDF.
+    """
+    document = fitz.open(file_path)
     text = ""
-    for page in reader.pages:
-        text += page.extract_text() + "\n"
+    for page in document:
+        text += page.get_text()
+    document.close()
+    
     return text
+
+async def answer_question(question: str, pdf_text: str):
+    """
+    Answers a question based on the provided PDF text using Gemini 1.5 Flash.
+
+    Args:
+        question (str): The question to answer.
+        pdf_text (str): The context extracted from the PDF.
+
+    Returns:
+        str: The answer to the question.
+    """
+    # Prepare input for the Gemini model
+    content = [
+        {
+            "parts": [
+                {"text": pdf_text}  # Pass the extracted PDF text as context
+            ]
+        }
+    ]
+
+    # Generate content using the Gemini model
+    response = genai.GenerativeModel("gemini-1.5-flash").generate_content(contents=content)
+
+    # Check if a response was generated and return it
+    if response and hasattr(response, 'text'):
+        return response.text.strip()
+    
+    return "I'm sorry, I couldn't find an answer to that question."

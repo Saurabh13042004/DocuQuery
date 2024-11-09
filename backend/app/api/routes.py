@@ -1,34 +1,35 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Depends
 from sqlalchemy.orm import Session
-from ..database import get_db
-from .. import models, schemas
-from ..services.pdf_service import save_uploaded_file, extract_text_from_pdf
-from ..services.qa_service import qa_service
+from .. import models, schemas, database
+from ..services import pdf_service 
 
 router = APIRouter()
 
-@router.post("/upload", response_model=schemas.Document)
-def upload_pdf(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    if not file.filename.endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
-    
-    file_path = save_uploaded_file(file)
-    
-    db_document = models.Document(filename=file.filename, file_path=file_path)
+@router.post("/upload/")
+async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(database.get_db)):
+    file_location = await pdf_service.save_pdf(file)  # Call save_pdf from pdf_service directly
+    pdf_text = await pdf_service.extract_text_from_pdf(file_location)
+
+    db_document = models.Document(filename=file.filename)  # Add additional fields as necessary.
     db.add(db_document)
     db.commit()
-    db.refresh(db_document)
     
-    return db_document
+    return {"filename": file.filename}
 
-@router.post("/ask", response_model=dict)
-def ask_question(question_request: schemas.QuestionRequest, db: Session = Depends(get_db)):
-    document = db.query(models.Document).filter(models.Document.id == question_request.document_id).first()
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+@router.post("/ask/")
+async def ask_question(question_request: schemas.QuestionRequest, db: Session = Depends(database.get_db)):
+    document_id = question_request.document_id
+    question = question_request.question
     
-    text = extract_text_from_pdf(document.file_path)
-    vector_store = qa_service.create_vector_store(text)
-    answer = qa_service.answer_question(vector_store, question_request.question)
+    # Fetch the PDF text based on document_id (you need to implement this logic)
+    db_document = db.query(models.Document).filter(models.Document.id == document_id).first()
+    
+    if not db_document:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    
+    # Assuming you have stored PDF text somewhere or can extract it again
+    pdf_text = await pdf_service.extract_text_from_pdf(f"pdfs/{db_document.filename}")
+
+    answer = await pdf_service.answer_question(question, pdf_text)
     
     return {"answer": answer}
