@@ -1,35 +1,40 @@
-from fastapi import APIRouter, UploadFile, File, Depends
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
 from .. import models, schemas, database
-from ..services import pdf_service 
+from ..services import pdf_service
+import os
 
 router = APIRouter()
 
-@router.post("/upload/")
-async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(database.get_db)):
-    file_location = await pdf_service.save_pdf(file)  # Call save_pdf from pdf_service directly
-    pdf_text = await pdf_service.extract_text_from_pdf(file_location)
+from datetime import datetime
 
-    db_document = models.Document(filename=file.filename)  # Add additional fields as necessary.
+@router.post("/upload/", response_model=schemas.DocumentResponse)
+async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(database.get_db)):
+    # Save and process the PDF
+    file_location = await pdf_service.save_pdf(file)
+    
+    # Create a new Document record with file path and upload_date
+    db_document = models.Document(
+        filename=file.filename,
+        file_path=file_location,
+        upload_date=datetime.utcnow()
+    )
     db.add(db_document)
     db.commit()
+    db.refresh(db_document)
     
-    return {"filename": file.filename}
+    return db_document
+
 
 @router.post("/ask/")
 async def ask_question(question_request: schemas.QuestionRequest, db: Session = Depends(database.get_db)):
-    document_id = question_request.document_id
-    question = question_request.question
+    document = db.query(models.Document).filter(models.Document.id == question_request.id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
     
-    # Fetch the PDF text based on document_id (you need to implement this logic)
-    db_document = db.query(models.Document).filter(models.Document.id == document_id).first()
-    
-    if not db_document:
-        raise HTTPException(status_code=404, detail="Document not found.")
-    
-    # Assuming you have stored PDF text somewhere or can extract it again
-    pdf_text = await pdf_service.extract_text_from_pdf(f"pdfs/{db_document.filename}")
-
-    answer = await pdf_service.answer_question(question, pdf_text)
+    # Use the stored file_path directly
+    pdf_text = await pdf_service.extract_text_from_pdf(document.file_path)
+    answer = await pdf_service.answer_question(question_request.question, pdf_text)
     
     return {"answer": answer}
+

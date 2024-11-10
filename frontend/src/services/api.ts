@@ -1,27 +1,26 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = 'http://127.0.0.1:8000'; // Update with your actual backend URL
 
 export const uploadPDF = async (file: File) => {
   const formData = new FormData();
   formData.append('file', file);
+  
   const response = await axios.post(`${API_URL}/upload`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
   });
-  return response.data;
+  console.log(response.data);
+  return response.data; // Ensure this returns necessary data like document ID
 };
 
 export const askQuestion = async (documentId: number, question: string) => {
+  console.log(`Sending question: ${question} to document ID: ${documentId}`);
   const response = await axios.post(`${API_URL}/ask`, {
-    document_id: documentId,
+    id: documentId,
     question,
   });
-  return response.data;
-};
-
-export const getDocuments = async () => {
-  const response = await axios.get(`${API_URL}/documents`);
-  return response.data;
+  
+  return response.data; // Ensure this returns an object containing 'answer'
 };

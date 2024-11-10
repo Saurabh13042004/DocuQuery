@@ -6,3 +6,29 @@
     --radius: 0.5rem
   }
 }
+
+
+/* Add this to your global CSS or appropriate styles */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+.flex-grow {
+  display: flex;
+  flex-direction: column;
+}
+
+.overflow-auto {
+  overflow-y: auto; /* Enable vertical scrolling */
+}
+
+/* Optional styling for better visual separation */
+.chat-container {
+  padding: 16px; /* Adjust as needed */
+}
+
+.chat-input {
+  border-top: 1px solid #e5e7eb; /* Tailwind gray-300 */
+}
