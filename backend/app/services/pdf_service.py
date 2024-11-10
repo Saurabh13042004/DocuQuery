@@ -1,6 +1,6 @@
 import os
 import boto3
-import fitz  
+import pymupdf as fitz
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage
