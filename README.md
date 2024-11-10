@@ -2,58 +2,34 @@
 
 ## Overview
 
-DocuQuery is an intelligent document query system that allows users to upload PDF documents and ask questions about their content using natural language processing. The application provides an intuitive interface for document management and real-time question-answering capabilities.
+DocuQuery is an intelligent document query system that allows users to upload PDF documents and ask questions about their content using advanced natural language processing. The application leverages LangChain integrated with Google's Generative AI (Gemini 1.5 Flash) for powerful and efficient question answering. It offers an intuitive interface for document management and real-time, context-aware responses to user queries.
 
 
+## ✨ Key Features
 
-## 🚀 Features
-
-### Core Functionality
-- **PDF Upload & Management**
-  - Upload PDF documents
-  - View uploaded document history
-  - Automatic text extraction from PDFs
-  - Secure document storage using AWS S3
-
-- **Intelligent Question Answering**
-  - Natural language question processing
-  - Context-aware answer generation using Gemini AI
-  - Support for follow-up questions
-  - Real-time response generation
-
-- **User Interface**
-  - Clean, intuitive design
-  - Responsive layout
-  - Progress indicators for uploads
-  - Error handling and feedback
-
-### Technical Features
-- RESTful API architecture
-- Document metadata management
-- Vector-based document indexing
-- Efficient text extraction and processing
-- Containerized deployment using Docker
+- 📄 Upload and process PDF documents with ease
+- 🔍 Ask questions about document content using natural language
+- 🤖 Get AI-powered answers leveraging Gemini 1.5 Flash model
+- 💾 Efficient document storage and retrieval (local or cloud-based)
 
 ## 🛠 Tech Stack
 
 ### Backend
 - **FastAPI**: High-performance web framework for building APIs
 - **LangChain**: Framework for developing applications powered by language models
-- **SQLite**: Database for document metadata storage
+- **Google Generative AI**: Integration with Gemini 1.5 Flash model via ChatGoogleGenerativeAI
+- **SQLite**: Database for document metadata storage in development
+- **SQLite-Cloud**: Database for document metadata storage in production
 - **Python 3.12+**: Core programming language
 
 ### Frontend
-- **React**: User interface development
+- **React**: User interface development with TypeScript
 - **Vite.js**: Build tool and development server
-- **TypeScript**: Type-safe JavaScript
 - **Tailwind CSS**: Utility-first CSS framework for styling
 
-### AI/ML
-- **Gemini AI**: Advanced language model for question answering
-
 ### Storage
-- **AWS S3**: Cloud storage for PDF documents
-- **SQLite**: Local database for development
+- **AWS S3**: Cloud storage for PDF documents in production
+- **Local filesystem**: For storing PDFs in development
 
 ### DevOps
 - **Docker**: Containerization for consistent deployment
