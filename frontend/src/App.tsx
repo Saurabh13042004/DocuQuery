@@ -9,15 +9,20 @@ export default function App() {
   const [documentId, setDocumentId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<{ question: string; answer: string; loading: boolean }[]>([]);
+  const [uploading, setUploading] = useState<boolean>(false);  // Add uploading state
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setFileName(file.name);
+      setUploading(true);  // Set uploading to true when upload starts
+
       const uploadResponse = await uploadPDF(file);
       setDocumentId(uploadResponse.id);
       console.log(`Uploaded file: ${file.name} with ID: ${uploadResponse.id}`);
+
+      setUploading(false);  // Set uploading to false once upload is complete
     }
   };
 
@@ -48,7 +53,6 @@ export default function App() {
     
     setChatHistory((prev) => {
       const newHistory = [...prev];
-      // Find the last message and update it with the AI response and loading status
       const lastMessageIndex = newHistory.length - 1;
       newHistory[lastMessageIndex] = { 
         question: trimmedMessage, 
@@ -63,7 +67,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen">
-      <Header fileName={fileName} onUploadClick={handleButtonClick} />
+      <Header fileName={fileName} onUploadClick={handleButtonClick} uploading={uploading} /> {/* Pass uploading state */}
       
       <main className="flex flex-col flex-grow overflow-hidden pt-20 sm:pt-24">
         <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 lg:pb-24">

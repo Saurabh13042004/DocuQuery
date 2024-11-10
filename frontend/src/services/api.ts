@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://127.0.0.1:8000'; // Update with your actual backend URL
+const API_URL = 'https://docuquery.onrender.com'; // Update with your actual backend URL
 
 export const uploadPDF = async (file: File) => {
   const formData = new FormData();

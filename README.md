@@ -4,6 +4,8 @@
 
 DocuQuery is an intelligent document query system that allows users to upload PDF documents and ask questions about their content using natural language processing. The application provides an intuitive interface for document management and real-time question-answering capabilities.
 
+
+
 ## 🚀 Features
 
 ### Core Functionality
@@ -11,11 +13,11 @@ DocuQuery is an intelligent document query system that allows users to upload PD
   - Upload PDF documents
   - View uploaded document history
   - Automatic text extraction from PDFs
-  - Secure document storage
+  - Secure document storage using AWS S3
 
 - **Intelligent Question Answering**
   - Natural language question processing
-  - Context-aware answer generation
+  - Context-aware answer generation using Gemini AI
   - Support for follow-up questions
   - Real-time response generation
 
@@ -30,35 +32,39 @@ DocuQuery is an intelligent document query system that allows users to upload PD
 - Document metadata management
 - Vector-based document indexing
 - Efficient text extraction and processing
+- Containerized deployment using Docker
 
 ## 🛠 Tech Stack
 
 ### Backend
 - **FastAPI**: High-performance web framework for building APIs
 - **LangChain**: Framework for developing applications powered by language models
-- **SQLite/PostgreSQL**: Database for document metadata storage
-- **PyPDF**: PDF processing and text extraction
-- **Python 3.9+**: Core programming language
+- **SQLite**: Database for document metadata storage
+- **Python 3.12+**: Core programming language
 
 ### Frontend
-- **React.js**: User interface development
-- **Tailwind CSS**: Styling and responsive design
-- **Axios**: HTTP client for API requests
+- **React**: User interface development
+- **Vite.js**: Build tool and development server
+- **TypeScript**: Type-safe JavaScript
+- **Tailwind CSS**: Utility-first CSS framework for styling
 
 ### AI/ML
-- **OpenAI**: Language model integration
-- **FAISS**: Vector storage and similarity search
+- **Gemini AI**: Advanced language model for question answering
 
 ### Storage
-- Local filesystem (development)
-- AWS S3 (production) for document storage
+- **AWS S3**: Cloud storage for PDF documents
+- **SQLite**: Local database for development
+
+### DevOps
+- **Docker**: Containerization for consistent deployment
 
 ## 📋 Prerequisites
 
-- Python 3.9 or higher
+- Python 3.12 or higher
 - Node.js 14.0 or higher
-- OpenAI API key
-- SQLite (development) or PostgreSQL (production)
+- Gemini AI API key
+- AWS account with S3 access
+- Docker (for containerized deployment)
 
 ## 🚀 Getting Started
 
@@ -100,9 +106,15 @@ Create a `.env` file in the backend directory with the following variables:
 
 ```env
 DATABASE_URL=sqlite:///./test.db
-OPENAI_API_KEY=your_openai_api_key_here
-UPLOAD_DIR=uploads
+GEMINI_API_KEY=your_gemini_api_key_here
+AWS_ACCESS_KEY=your_aws_access_key
+AWS_SECRET_KEY=your_aws_secret_key
+AWS_BUCKET_NAME=your_s3_bucket_name
+AWS_REGION=your_aws_region
+ENVIRONMENT=development  # Use "production" for the production environment
 ```
+
+After running the backend, update the `API_URL` in `frontend/src/services/api.ts` to match your backend URL.
 
 ## 📚 API Documentation
 
@@ -110,21 +122,23 @@ UPLOAD_DIR=uploads
 
 - `POST /upload`: Upload PDF documents
 - `POST /ask`: Ask questions about documents
-- `GET /documents`: List uploaded documents
 
-For detailed API documentation, visit `/docs` after starting the backend server.
 
-## 🧪 Testing
+## 🐳 Docker Deployment
 
-Run backend tests:
+To build and run the application using Docker:
+
+1. Build the Docker image:
 ```bash
-pytest
+docker build -t docuquery .
 ```
 
-Run frontend tests:
+2. Run the container:
 ```bash
-npm test
+docker run -p 8000:8000 -e GEMINI_API_KEY=your_key -e AWS_ACCESS_KEY=your_key -e AWS_SECRET_KEY=your_key -e AWS_BUCKET_NAME=your_bucket -e AWS_REGION=your_region docuquery
 ```
+
+
 
 ## 🤝 Contributing
 
