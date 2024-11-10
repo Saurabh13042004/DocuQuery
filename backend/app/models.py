@@ -6,5 +6,5 @@ class Document(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String, index=True)
-    file_path = Column(String)  # Store full path/URL
+    file_path = Column(String)
     upload_date = Column(DateTime)

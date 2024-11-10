@@ -3,7 +3,7 @@ import React from 'react';
 interface HeaderProps {
   fileName: string | null;
   onUploadClick: () => void;
-  uploading: boolean;  // Add uploading state
+  uploading: boolean;  
 }
 
 const Header: React.FC<HeaderProps> = ({ fileName, onUploadClick, uploading }) => {
@@ -22,11 +22,11 @@ const Header: React.FC<HeaderProps> = ({ fileName, onUploadClick, uploading }) =
           </div>
         )}
         
-        {/* Display loading indicator when uploading */}
+ 
         {uploading ? (
           <div className="flex items-center">
             <span>Uploading...</span>
-            <div className="ml-2 border-t-2 border-green-600 rounded-full w-6 h-6 animate-spin"></div> {/* Simple spinner */}
+            <div className="ml-2 border-t-2 border-green-600 rounded-full w-6 h-6 animate-spin"></div> 
           </div>
         ) : (
           <button onClick={onUploadClick} className="flex relative justify-center text-sm font-semibold text-black w-full sm:w-auto">

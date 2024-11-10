@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'https://docuquery.onrender.com'; // Update with your actual backend URL
+const API_URL = 'http://127.0.0.1:8000'; 
 
 export const uploadPDF = async (file: File) => {
   const formData = new FormData();
@@ -12,7 +12,7 @@ export const uploadPDF = async (file: File) => {
     },
   });
   console.log(response.data);
-  return response.data; // Ensure this returns necessary data like document ID
+  return response.data;
 };
 
 export const askQuestion = async (documentId: number, question: string) => {
@@ -22,5 +22,5 @@ export const askQuestion = async (documentId: number, question: string) => {
     question,
   });
   
-  return response.data; // Ensure this returns an object containing 'answer'
+  return response.data;
 };

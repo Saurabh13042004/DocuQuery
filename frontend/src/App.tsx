@@ -9,20 +9,20 @@ export default function App() {
   const [documentId, setDocumentId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [chatHistory, setChatHistory] = useState<{ question: string; answer: string; loading: boolean }[]>([]);
-  const [uploading, setUploading] = useState<boolean>(false);  // Add uploading state
+  const [uploading, setUploading] = useState<boolean>(false); 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setFileName(file.name);
-      setUploading(true);  // Set uploading to true when upload starts
+      setUploading(true);  
 
       const uploadResponse = await uploadPDF(file);
       setDocumentId(uploadResponse.id);
       console.log(`Uploaded file: ${file.name} with ID: ${uploadResponse.id}`);
 
-      setUploading(false);  // Set uploading to false once upload is complete
+      setUploading(false);  
     }
   };
 
@@ -67,17 +67,17 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen">
-      <Header fileName={fileName} onUploadClick={handleButtonClick} uploading={uploading} /> {/* Pass uploading state */}
+      <Header fileName={fileName} onUploadClick={handleButtonClick} uploading={uploading} />
       
       <main className="flex flex-col flex-grow overflow-hidden pt-20 sm:pt-24">
-        <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8 lg:pb-24">
+        <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-12 lg:pb-24">
           {chatHistory.map((chat, index) => (
             <div key={index} className="mb-4">
               <ChatMessage isUser={true} message={chat.question} />
               <ChatMessage 
                 isUser={false} 
                 message={chat.answer || ""} 
-                isLoading={chat.loading} // Pass the loading state to each message
+                isLoading={chat.loading}
               />
             </div>
           ))}

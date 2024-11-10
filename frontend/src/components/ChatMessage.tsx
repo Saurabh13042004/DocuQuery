@@ -3,7 +3,7 @@ import React from 'react';
 interface ChatMessageProps {
   isUser: boolean;
   message: string;
-  isLoading?: boolean; // Optional prop to show the loading state
+  isLoading?: boolean; 
 }
 
 const ChatMessage: React.FC<ChatMessageProps> = ({ isUser, message, isLoading }) => {
@@ -24,9 +24,9 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ isUser, message, isLoading })
       
       <div className={`flex-1 ${isUser ? 'text-gray-900' : 'text-muted-foreground'}`}>
         {isLoading ? (
-          <span className="text-gray-500">Thinking...</span> // Show "Thinking..." when loading
+          <span className="text-gray-500">Thinking...</span> 
         ) : (
-          message // Show the AI message when it's available
+          message 
         )}
       </div>
     </div>
