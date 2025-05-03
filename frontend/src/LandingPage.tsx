@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Cover } from "@/components/ui/cover";
 import { FeaturesSectionDemo } from "./components/Features";
 import { FileUpload } from "@/components/ui/file-upload";
+import { Link } from "react-router-dom";
 
 function Navbar({ className }: { className?: string }) {
   const [active, setActive] = useState<string | null>(null);
@@ -99,7 +100,7 @@ function LandingPage() {
             Get Started
           </button>
           <button className="px-6 py-3 bg-transparent border border-blue-600 text-blue-600 rounded-full font-medium hover:bg-blue-700 hover:text-white transition">
-            Login / Register
+            <Link to="/login">Login</Link>
           </button>
         </div>
       </div>
