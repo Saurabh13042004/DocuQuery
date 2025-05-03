@@ -7,7 +7,7 @@ export default defineConfig({
     host: '0.0.0.0',  // Listens on all interfaces
     port: 3000,        // Replace with your port number if different
   },
-  plugins: [react()],
+  plugins: [react() ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

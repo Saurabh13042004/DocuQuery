@@ -1,33 +1,6 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@layer base {
-  :root {
-    --radius: 0.5rem
-  }
-}
 
 
-html,
-body,
-#root {
-  height: 100%;
-}
-
-.flex-grow {
-  display: flex;
-  flex-direction: column;
-}
-
-.overflow-auto {
-  overflow-y: auto; 
-}
-
-
-.chat-container {
-  padding: 16px;
-}
-
-.chat-input {
-  border-top: 1px solid #e5e7eb; 
-}
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));

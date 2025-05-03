@@ -3,6 +3,7 @@ import { uploadPDF, askQuestion } from "@/services/api";
 import Header from "./components/Header";
 import ChatMessage from "./components/ChatMessage";
 import ChatInput from "./components/ChatInput";
+import DarkModeToggle from "./components/DarkModeTogggle";
 
 export default function App() {
   const [fileName, setFileName] = useState<string | null>(null);
@@ -66,39 +67,59 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen">
-      <Header fileName={fileName} onUploadClick={handleButtonClick} uploading={uploading} />
+    <div className="container mx-auto p-4">
+      <div className="flex justify-end mb-4">
+        <DarkModeToggle />
+      </div>
       
-      <main className="flex flex-col flex-grow overflow-hidden pt-20 sm:pt-24">
-        <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-12 lg:pb-24">
-          {chatHistory.map((chat, index) => (
-            <div key={index} className="mb-4">
-              <ChatMessage isUser={true} message={chat.question} />
-              <ChatMessage 
-                isUser={false} 
-                message={chat.answer || ""} 
-                isLoading={chat.loading}
-              />
-            </div>
-          ))}
-        </div>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold mb-4">DocuQuery</h1>
         
-        <div className="border-t p-4 bg-white fixed bottom-0 left-0 w-full">
-          <ChatInput 
-            message={message}
-            onMessageChange={setMessage}
-            onSendMessage={handleSendMessage}
+        <div className="mb-4">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            className="hidden"
+            accept=".pdf"
           />
+          <button 
+            onClick={handleButtonClick}
+            className="px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-md"
+            disabled={uploading}
+          >
+            {uploading ? "Uploading..." : "Upload PDF"}
+          </button>
+          {fileName && <p className="mt-2">Uploaded: {fileName}</p>}
         </div>
-        
+      </div>
+      
+      <div className="border dark:border-gray-700 rounded-lg p-4 mb-4 h-96 overflow-y-auto">
+        {chatHistory.map((chat, index) => (
+          <div key={index} className="mb-4">
+            <div className="font-semibold">You: {chat.question}</div>
+            <div className="pl-4 mt-1">
+              {chat.loading ? "Loading..." : `DocuQuery: ${chat.answer}`}
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      <div className="flex gap-2">
         <input
-          type="file"
-          accept=".pdf"
-          ref={fileInputRef}
-          onChange={handleFileUpload}
-          className="hidden"
+          type="text"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Ask a question about your document..."
+          className="flex-1 p-2 border dark:border-gray-700 dark:bg-gray-800 rounded-md"
         />
-      </main>
+        <button
+          onClick={handleSendMessage}
+          className="px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-md"
+        >
+          Send
+        </button>
+      </div>
     </div>
   );
 }

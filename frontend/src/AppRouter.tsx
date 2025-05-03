@@ -6,13 +6,14 @@ import App from './App';
 const AppRouter: React.FC = () => {
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/app" element={<App />} />
-      </Routes>
+      <div className="min-h-screen bg-white text-black dark:bg-neutral-950 dark:text-white">
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/app" element={<App />} />
+        </Routes>
+      </div>
     </Router>
   );
 };
 
 export default AppRouter;
-
