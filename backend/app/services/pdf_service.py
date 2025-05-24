@@ -8,12 +8,12 @@ from langchain_core.messages import HumanMessage
 load_dotenv()
 
 
-s3_client = boto3.client(
-    's3',
-    aws_access_key_id=os.environ["AWS_ACCESS_KEY"],
-    aws_secret_access_key=os.environ['AWS_SECRET_KEY'],
-    region_name=os.environ['AWS_REGION']
-)
+# s3_client = boto3.client(
+#     's3',
+#     aws_access_key_id=os.environ["AWS_ACCESS_KEY"],
+#     aws_secret_access_key=os.environ['AWS_SECRET_KEY'],
+#     region_name=os.environ['AWS_REGION']
+# )
 
 llm = ChatGoogleGenerativeAI(
     model="gemini-1.5-flash",
