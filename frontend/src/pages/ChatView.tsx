@@ -4,35 +4,125 @@ import { Send, ChevronDown, Edit, Download, Share2, Bookmark, Maximize, X } from
 import { usePdf } from '../context/PdfContext';
 import ChatMessage from '../components/ChatMessage';
 import PdfViewer from '../components/PdfViewer';
+import { askQuestion, saveMessage, fetchDocumentMessages } from '../services/api';
+import { MessageType } from '../types';
 
 const ChatView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { getDocumentById } = usePdf();
+  const { getDocumentById, updateDocument } = usePdf();
   const document = getDocumentById(id || '');
   
   const [message, setMessage] = useState('');
   const [showPdfViewer, setShowPdfViewer] = useState(true);
   const [fullScreenPdf, setFullScreenPdf] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [messages, setMessages] = useState<MessageType[]>(document?.messages || []);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   
-  const handleSendMessage = () => {
-    if (message.trim() === '') return;
+  // Load messages when document is opened
+  useEffect(() => {
+    const loadMessages = async () => {
+      if (document) {
+        try {
+          // Only fetch if we don't already have messages loaded
+          if (!document.messages || document.messages.length === 0) {
+            const messageResponses = await fetchDocumentMessages(parseInt(document.id));
+            
+            // Map response to MessageType
+            const loadedMessages: MessageType[] = messageResponses.map(msg => ({
+              id: msg.id.toString(),
+              content: msg.content,
+              timestamp: msg.timestamp,
+              isUser: msg.is_user,
+              sourcePdf: document.name
+            }));
+            
+            setMessages(loadedMessages);
+            updateDocument(document.id, { messages: loadedMessages });
+          }
+        } catch (error) {
+          console.error('Failed to load message history:', error);
+        }
+      }
+    };
     
-    // Simulate sending message
+    loadMessages();
+  }, [document?.id]);
+  
+  const handleSendMessage = async () => {
+    if (!message.trim() || !document || isLoading) return;
+    
+    // Create user message
+    const userMessage: MessageType = {
+      id: Date.now().toString(),
+      content: message,
+      timestamp: new Date().toISOString(),
+      isUser: true,
+      sourcePdf: document.name
+    };
+    
+    // Add user message to chat
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    
+    // Clear input and show loading state
+    setMessage('');
     setIsLoading(true);
-    setTimeout(() => {
-      // In a real app, you would send the message to an API
-      setMessage('');
+    
+    try {
+      // Save user message to backend
+      await saveMessage(parseInt(document.id), userMessage.content, true);
+      
+      // Call API to get answer
+      const response = await askQuestion(parseInt(document.id), message);
+      
+      // Create AI response message
+      const aiMessage: MessageType = {
+        id: (Date.now() + 1).toString(),
+        content: response.answer,
+        timestamp: new Date().toISOString(),
+        isUser: false,
+        sourcePdf: document.name
+      };
+      
+      // Save AI message to backend
+      await saveMessage(parseInt(document.id), aiMessage.content, false);
+      
+      // Add AI message to chat
+      const finalMessages = [...updatedMessages, aiMessage];
+      setMessages(finalMessages);
+      
+      // Update document with messages
+      updateDocument(document.id, { messages: finalMessages });
+      
+    } catch (error) {
+      console.error('Error getting answer:', error);
+      
+      // Add error message
+      const errorMessage: MessageType = {
+        id: (Date.now() + 1).toString(),
+        content: "Sorry, I couldn't process your question. Please try again.",
+        timestamp: new Date().toISOString(),
+        isUser: false,
+        sourcePdf: document.name
+      };
+      
+      // Save error message to backend
+      await saveMessage(parseInt(document.id), errorMessage.content, false);
+      
+      setMessages([...updatedMessages, errorMessage]);
+      updateDocument(document.id, { messages: [...updatedMessages, errorMessage] });
+      
+    } finally {
       setIsLoading(false);
       
       // Focus input after sending
       if (inputRef.current) {
         inputRef.current.focus();
       }
-    }, 500);
+    }
   };
   
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -42,10 +132,17 @@ const ChatView: React.FC = () => {
     }
   };
   
+  // Sync messages with document
+  useEffect(() => {
+    if (document?.messages) {
+      setMessages(document.messages);
+    }
+  }, [document?.id]);
+  
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [document?.messages]);
+  }, [messages]);
   
   // Focus input on mount
   useEffect(() => {
@@ -136,8 +233,8 @@ const ChatView: React.FC = () => {
         {/* Chat messages */}
         <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
           <div className="max-w-3xl mx-auto">
-            {document.messages && document.messages.length > 0 ? (
-              document.messages.map((msg, index) => (
+            {messages && messages.length > 0 ? (
+              messages.map((msg, index) => (
                 <ChatMessage key={index} message={msg} />
               ))
             ) : (
@@ -162,6 +259,18 @@ const ChatView: React.FC = () => {
                 </div>
               </div>
             )}
+            {isLoading && (
+              <div className="flex items-center p-4 bg-white rounded-lg shadow-sm mb-4">
+                <div className="mr-3">
+                  <div className="animate-pulse flex space-x-1">
+                    <div className="h-2 w-2 bg-indigo-400 rounded-full"></div>
+                    <div className="h-2 w-2 bg-indigo-400 rounded-full"></div>
+                    <div className="h-2 w-2 bg-indigo-400 rounded-full"></div>
+                  </div>
+                </div>
+                <p className="text-gray-500">DocuQuery is thinking...</p>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
         </div>
@@ -178,6 +287,7 @@ const ChatView: React.FC = () => {
                 placeholder="Ask a question about this document..."
                 className="flex-1 py-3 px-4 text-sm bg-transparent border-0 focus:ring-0 focus:outline-none resize-none max-h-32"
                 rows={1}
+                disabled={isLoading}
               />
               <button
                 onClick={handleSendMessage}

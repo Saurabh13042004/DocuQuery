@@ -1,13 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { File, FilePlus, Star, MoreVertical, Folder } from 'lucide-react';
+import { File, FilePlus, Star, MoreVertical, Folder, Loader } from 'lucide-react';
 import { usePdf } from '../context/PdfContext';
+import { useSearch } from '../context/SearchContext';
 import UploadModal from '../components/UploadModal';
 
 const Dashboard: React.FC = () => {
-  const { documents } = usePdf();
+  const { documents, isLoading, fetchUserDocuments } = usePdf();
+  const { searchQuery } = useSearch();
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>('all');
+
+  // Refresh documents when the component mounts
+  useEffect(() => {
+    fetchUserDocuments();
+  }, []);
 
   const categories = [
     { id: 'all', name: 'All Documents' },
@@ -16,11 +23,25 @@ const Dashboard: React.FC = () => {
     { id: 'shared', name: 'Shared with me' }
   ];
 
-  const filteredDocuments = 
-    filterCategory === 'all' ? documents :
-    filterCategory === 'starred' ? documents.filter(doc => doc.starred) :
-    filterCategory === 'recent' ? documents.slice(0, 5) :
-    documents.filter(doc => doc.shared);
+  // Filter documents based on both category and search query
+  const filteredDocuments = documents
+    .filter(doc => {
+      // Apply search filter if there's a query
+      if (searchQuery && !doc.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      
+      // Apply category filter
+      if (filterCategory === 'all') return true;
+      if (filterCategory === 'starred') return doc.starred;
+      if (filterCategory === 'recent') return true; // We'll handle this differently below
+      if (filterCategory === 'shared') return doc.shared;
+      return true;
+    });
+
+  // Apply additional sorting/limiting for 'recent' category
+  const displayedDocuments = 
+    filterCategory === 'recent' ? filteredDocuments.slice(0, 5) : filteredDocuments;
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -54,8 +75,16 @@ const Dashboard: React.FC = () => {
         ))}
       </div>
       
+      {/* Loading state */}
+      {isLoading && (
+        <div className="flex flex-col items-center justify-center py-12">
+          <Loader className="h-8 w-8 text-indigo-600 animate-spin mb-4" />
+          <p className="text-gray-500">Loading your documents...</p>
+        </div>
+      )}
+      
       {/* Empty state */}
-      {documents.length === 0 && (
+      {!isLoading && documents.length === 0 && (
         <div className="flex flex-col items-center justify-center bg-white rounded-lg shadow-sm p-12 border border-gray-200">
           <div className="bg-indigo-100 p-4 rounded-full mb-4">
             <File className="h-8 w-8 text-indigo-600" />
@@ -75,7 +104,7 @@ const Dashboard: React.FC = () => {
       )}
       
       {/* Document grid */}
-      {documents.length > 0 && (
+      {!isLoading && documents.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-2 border-dashed border-indigo-200 rounded-lg p-6 flex flex-col items-center justify-center hover:bg-indigo-100 transition-all cursor-pointer"
             onClick={() => setShowUploadModal(true)}>
@@ -85,7 +114,7 @@ const Dashboard: React.FC = () => {
             <h3 className="text-indigo-700 font-medium">Upload New PDF</h3>
           </div>
           
-          {filteredDocuments.map((doc) => (
+          {displayedDocuments.map((doc) => (
             <div key={doc.id} className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200">
               <div className="p-4 border-b border-gray-100">
                 <div className="flex justify-between items-start">

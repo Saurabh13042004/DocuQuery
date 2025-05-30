@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
+from typing import List
 
 class DocumentCreate(BaseModel):
     filename: str
@@ -9,12 +10,29 @@ class QuestionRequest(BaseModel):
     question: str
     id: int
     
+class MessageBase(BaseModel):
+    content: str
+    is_user: bool
+
+class MessageCreate(MessageBase):
+    pass
+
+class Message(MessageBase):
+    id: int
+    document_id: int
+    timestamp: datetime
+    
+    class Config:
+        orm_mode = True
+
+# Update DocumentResponse to include messages
 class DocumentResponse(BaseModel):
     id: int
     filename: str
     file_path: str
     upload_date: datetime
-
+    messages: List[Message] = []
+    
     class Config:
         orm_mode = True
 

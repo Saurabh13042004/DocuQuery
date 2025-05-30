@@ -1,56 +1,28 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { DocumentType } from '../types';
+import { fetchDocuments, DocumentResponse } from '../services/api';
 
-// Sample document data
-const sampleDocuments: DocumentType[] = [
-  {
-    id: '1',
-    name: 'Business Proposal.pdf',
-    size: 2.4 * 1024 * 1024,
-    createdAt: '2023-09-15',
-    updatedAt: '2023-09-20',
-    pageCount: 12,
-    starred: true,
-    folder: 'Work',
-    messages: [
-      {
-        id: '101',
-        content: 'What are the main points in this proposal?',
-        isUser: true,
-        timestamp: '2023-09-20T14:22:00Z',
-      },
-      {
-        id: '102',
-        content: 'The main points in this business proposal are:\n\n1. Market opportunity for AI-powered document analysis\n2. Proposed budget of $1.2M for initial development\n3. Timeline of 6 months to MVP\n4. Team structure of 8 engineers and 2 product managers',
-        isUser: false,
-        timestamp: '2023-09-20T14:22:30Z',
-        citations: [2, 5, 8],
-      },
-    ],
-  },
-  {
-    id: '2',
-    name: 'Financial Report Q3.pdf',
-    size: 3.7 * 1024 * 1024,
-    createdAt: '2023-08-05',
-    updatedAt: '2023-08-05',
-    pageCount: 24,
+// Convert backend document format to frontend format
+const mapDocumentResponse = (doc: DocumentResponse): DocumentType => {
+  return {
+    id: doc.id.toString(),
+    name: doc.filename,
+    size: 0, // We don't have size from the backend
+    createdAt: new Date(doc.upload_date).toLocaleDateString(),
+    updatedAt: new Date(doc.upload_date).toLocaleDateString(),
+    pageCount: 1, // Default page count
     starred: false,
-    folder: 'Finance',
-    messages: [],
-  },
-  {
-    id: '3',
-    name: 'Research Paper.pdf',
-    size: 1.2 * 1024 * 1024,
-    createdAt: '2023-07-12',
-    updatedAt: '2023-07-15',
-    pageCount: 18,
-    starred: true,
-    folder: 'Research',
-    messages: [],
-  },
-];
+    folder: 'Uploads',
+    messages: doc.messages?.map(msg => ({
+      id: msg.id.toString(),
+      content: msg.content,
+      timestamp: msg.timestamp,
+      isUser: msg.is_user,
+      sourcePdf: doc.filename
+    })) || [],
+    filePath: doc.file_path // Store the file path for retrieval
+  };
+};
 
 interface PdfContextType {
   documents: DocumentType[];
@@ -58,15 +30,35 @@ interface PdfContextType {
   getDocumentById: (id: string) => DocumentType | undefined;
   updateDocument: (id: string, document: Partial<DocumentType>) => void;
   deleteDocument: (id: string) => void;
+  fetchUserDocuments: () => Promise<void>;
+  isLoading: boolean;
 }
 
 const PdfContext = createContext<PdfContextType | undefined>(undefined);
 
 export const PdfProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [documents, setDocuments] = useState<DocumentType[]>(sampleDocuments);
+  const [documents, setDocuments] = useState<DocumentType[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  const fetchUserDocuments = async () => {
+    try {
+      setIsLoading(true);
+      const docs = await fetchDocuments();
+      setDocuments(docs.map(mapDocumentResponse));
+    } catch (error) {
+      console.error('Failed to fetch documents:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Load documents when the component mounts
+  useEffect(() => {
+    fetchUserDocuments();
+  }, []);
   
   const addDocument = (document: DocumentType) => {
-    setDocuments([...documents, document]);
+    setDocuments(prev => [document, ...prev]);
   };
   
   const getDocumentById = (id: string) => {
@@ -90,6 +82,8 @@ export const PdfProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       getDocumentById,
       updateDocument,
       deleteDocument,
+      fetchUserDocuments,
+      isLoading
     }}>
       {children}
     </PdfContext.Provider>

@@ -1,13 +1,14 @@
 import React, { useState, useRef } from 'react';
 import { X, Upload, File, AlertCircle } from 'lucide-react';
 import { usePdf } from '../context/PdfContext';
+import { uploadPDF } from '../services/api';
 
 interface UploadModalProps {
   onClose: () => void;
 }
 
 const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
-  const { addDocument } = usePdf();
+  const { addDocument, fetchUserDocuments } = usePdf();
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -59,30 +60,25 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
     setFile(file);
   };
   
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!file) return;
     
     setIsUploading(true);
     setError(null);
     
-    // Simulate upload
-    setTimeout(() => {
-      // In a real app, you would upload the file to an API
-      const newDoc = {
-        id: Math.random().toString(36).substring(2, 11),
-        name: file.name,
-        size: file.size,
-        createdAt: new Date().toLocaleDateString(),
-        updatedAt: new Date().toLocaleDateString(),
-        pageCount: Math.floor(Math.random() * 30) + 1,
-        starred: false,
-        messages: [],
-      };
+    try {
+      const uploadedDocument = await uploadPDF(file);
       
-      addDocument(newDoc);
+      // After successful upload, refresh the documents list
+      await fetchUserDocuments();
+      
       setIsUploading(false);
       onClose();
-    }, 1500);
+    } catch (error) {
+      console.error('Upload error:', error);
+      setError('Failed to upload the document. Please try again.');
+      setIsUploading(false);
+    }
   };
   
   const handleBrowseClick = () => {

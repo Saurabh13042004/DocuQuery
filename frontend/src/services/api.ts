@@ -27,8 +27,6 @@ api.interceptors.response.use(
   }
 );
 
-
-
 export interface User {
   id: number;
   name: string;
@@ -43,6 +41,20 @@ export interface AuthResponse {
   user: User;
 }
 
+export interface DocumentResponse {
+  id: number;
+  filename: string;
+  file_path: string;
+  upload_date: string;
+}
+
+export interface MessageResponse {
+  id: number;
+  document_id: number;
+  content: string;
+  is_user: boolean;
+  timestamp: string;
+}
 
 export const signup = async (email: string, password: string, name: string): Promise<AuthResponse> => {
   const response = await api.post('/signup', {
@@ -76,14 +88,11 @@ export const logout = () => {
   localStorage.removeItem('user');
 };
 
-
-
-
-export const uploadPDF = async (file: File) => {
+export const uploadPDF = async (file: File): Promise<DocumentResponse> => {
   const formData = new FormData();
   formData.append('file', file);
   
-  const response = await api.post('/upload', formData, {
+  const response = await api.post<DocumentResponse>('/upload', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -92,11 +101,34 @@ export const uploadPDF = async (file: File) => {
   return response.data;
 };
 
+export const fetchDocuments = async (): Promise<DocumentResponse[]> => {
+  const response = await api.get<DocumentResponse[]>('/documents');
+  return response.data;
+};
+
 export const askQuestion = async (documentId: number, question: string) => {
-  const response = await api.post('/ask', {
-    id: documentId,
-    question,
+  try {
+    const response = await api.post('/ask', {
+      id: documentId,
+      question,
+    });
+    
+    return response.data;
+  } catch (error) {
+    console.error('API error in askQuestion:', error);
+    throw error;
+  }
+};
+
+export const fetchDocumentMessages = async (documentId: number): Promise<MessageResponse[]> => {
+  const response = await api.get<MessageResponse[]>(`/documents/${documentId}/messages`);
+  return response.data;
+};
+
+export const saveMessage = async (documentId: number, content: string, isUser: boolean): Promise<MessageResponse> => {
+  const response = await api.post<MessageResponse>(`/documents/${documentId}/messages`, {
+    content,
+    is_user: isUser
   });
-  
   return response.data;
 };

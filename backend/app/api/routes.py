@@ -2,11 +2,12 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from datetime import timedelta
+from typing import List
 from .. import models, schemas, database
 from ..services import pdf_service, auth_service
 import os
 import jwt
-
+from typing import List
 
 router = APIRouter()
 security = HTTPBearer()
@@ -107,4 +108,64 @@ async def ask_question(question_request: schemas.QuestionRequest, db: Session = 
     answer = await pdf_service.answer_question(question_request.question, pdf_text)
     
     return {"answer": answer}
+
+
+@router.get("/documents", response_model=List[schemas.DocumentResponse])
+async def get_documents(db: Session = Depends(database.get_db), current_user: models.User = Depends(get_current_user)):
+    documents = db.query(models.Document).filter(models.Document.user_id == current_user.id).order_by(models.Document.upload_date.desc()).all()
+    return documents
+
+
+@router.post("/documents/{document_id}/messages", response_model=schemas.Message)
+async def add_message(
+    document_id: int,
+    message: schemas.MessageCreate,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Check if document exists and belongs to user
+    document = db.query(models.Document).filter(
+        models.Document.id == document_id,
+        models.Document.user_id == current_user.id
+    ).first()
+    
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Create new message
+    db_message = models.Message(
+        document_id=document_id,
+        content=message.content,
+        is_user=message.is_user,
+        timestamp=datetime.utcnow()
+    )
+    
+    db.add(db_message)
+    db.commit()
+    db.refresh(db_message)
+    
+    return db_message
+
+
+@router.get("/documents/{document_id}/messages", response_model=List[schemas.Message])
+async def get_messages(
+    document_id: int,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Check if document exists and belongs to user
+    document = db.query(models.Document).filter(
+        models.Document.id == document_id,
+        models.Document.user_id == current_user.id
+    ).first()
+    
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Get messages for document
+    messages = db.query(models.Message).filter(
+        models.Message.document_id == document_id
+    ).order_by(models.Message.timestamp.asc()).all()
+    
+    return messages
 
