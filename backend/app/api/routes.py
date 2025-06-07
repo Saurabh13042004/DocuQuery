@@ -99,15 +99,31 @@ async def upload_pdf(file: UploadFile = File(...), db: Session = Depends(databas
 
 
 @router.post("/ask")
-async def ask_question(question_request: schemas.QuestionRequest, db: Session = Depends(database.get_db),  current_user: models.User = Depends(get_current_user)):
-    document = db.query(models.Document).filter(models.Document.id == question_request.id,        models.Document.user_id == current_user.id).first()
+async def ask_question(
+    question_request: schemas.QuestionRequest, 
+    db: Session = Depends(database.get_db),  
+    current_user: models.User = Depends(get_current_user)
+):
+    document = db.query(models.Document).filter(
+        models.Document.id == question_request.id,
+        models.Document.user_id == current_user.id
+    ).first()
+    
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
         
     pdf_text = await pdf_service.extract_text_from_pdf(document.file_path)
-    answer = await pdf_service.answer_question(question_request.question, pdf_text)
     
-    return {"answer": answer}
+    # Use the process_user_input function instead of answer_question
+    # This will handle both questions and edit requests
+    result = await pdf_service.process_user_input(
+        question_request.question, 
+        pdf_text, 
+        document.file_path
+    )
+    
+    # Return the full result (includes answer, is_edit flag, and editedPdfUrl if applicable)
+    return result
 
 
 @router.get("/documents", response_model=List[schemas.DocumentResponse])

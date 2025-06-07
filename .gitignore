@@ -33,3 +33,5 @@ temp/
 
 # Ignore Windows specific files
 Thumbs.db
+
+/backend/pdfs

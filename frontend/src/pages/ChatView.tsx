@@ -17,9 +17,19 @@ const ChatView: React.FC = () => {
   const [fullScreenPdf, setFullScreenPdf] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<MessageType[]>(document?.messages || []);
+  const [currentPdfUrl, setCurrentPdfUrl] = useState<string | undefined>(undefined);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Add the missing handleKeyDown function
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Submit message on Enter key, but allow Shift+Enter for new lines
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault(); // Prevent default to avoid new line
+      handleSendMessage();
+    }
+  };
   
   // Load messages when document is opened
   useEffect(() => {
@@ -87,6 +97,16 @@ const ChatView: React.FC = () => {
         sourcePdf: document.name
       };
       
+      // If this is an edit response, add the edited PDF URL
+      if (response.is_edit && response.editedPdfUrl) {
+        aiMessage.editedPdfUrl = response.editedPdfUrl;
+        
+        // Automatically show the edited PDF
+        setCurrentPdfUrl(response.editedPdfUrl);
+        // Make sure PDF viewer is visible
+        setShowPdfViewer(true);
+      }
+      
       // Save AI message to backend
       await saveMessage(parseInt(document.id), aiMessage.content, false);
       
@@ -125,11 +145,32 @@ const ChatView: React.FC = () => {
     }
   };
   
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
+  const handleViewEditedPdf = (url: string) => {
+    setCurrentPdfUrl(url);
+    setShowPdfViewer(true);
+  };
+  
+  const handleDownloadPdf = () => {
+    if (!document) return;
+    
+    // Get the current PDF URL (either edited or original)
+    const pdfToDownload = currentPdfUrl || document.filePath;
+    
+    // Create the full URL
+    const baseUrl = 'http://127.0.0.1:8000';
+    const downloadUrl = pdfToDownload?.startsWith('http') 
+      ? pdfToDownload 
+      : `${baseUrl}${pdfToDownload}`;
+    
+    // Create a temporary anchor element and trigger download
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = currentPdfUrl 
+      ? `edited_${document.name}` 
+      : document.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
   
   // Sync messages with document
@@ -165,7 +206,9 @@ const ChatView: React.FC = () => {
       {showPdfViewer && (
         <div className={`bg-white border-r border-gray-200 ${fullScreenPdf ? 'fixed inset-0 z-50' : 'w-1/3'}`}>
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <h2 className="font-medium text-gray-900 truncate">{document.name}</h2>
+            <h2 className="font-medium text-gray-900 truncate">
+              {currentPdfUrl ? `Edited: ${document.name}` : document.name}
+            </h2>
             <div className="flex items-center space-x-1">
               <button 
                 onClick={() => setFullScreenPdf(!fullScreenPdf)} 
@@ -184,7 +227,7 @@ const ChatView: React.FC = () => {
           
           <div className="flex flex-col h-full">
             <div className="flex-1 overflow-auto">
-              <PdfViewer document={document} />
+              <PdfViewer document={document} customPdfUrl={currentPdfUrl} />
             </div>
             
             <div className="p-3 border-t border-gray-200">
@@ -193,7 +236,10 @@ const ChatView: React.FC = () => {
                   <button className="p-1.5 text-gray-500 rounded-full hover:bg-gray-100">
                     <Edit className="h-4 w-4" />
                   </button>
-                  <button className="p-1.5 text-gray-500 rounded-full hover:bg-gray-100">
+                  <button 
+                    onClick={handleDownloadPdf}
+                    className="p-1.5 text-gray-500 rounded-full hover:bg-gray-100"
+                  >
                     <Download className="h-4 w-4" />
                   </button>
                   <button className="p-1.5 text-gray-500 rounded-full hover:bg-gray-100">
@@ -235,7 +281,11 @@ const ChatView: React.FC = () => {
           <div className="max-w-3xl mx-auto">
             {messages && messages.length > 0 ? (
               messages.map((msg, index) => (
-                <ChatMessage key={index} message={msg} />
+                <ChatMessage 
+                  key={index} 
+                  message={msg} 
+                  onViewEditedPdf={handleViewEditedPdf}
+                />
               ))
             ) : (
               <div className="flex flex-col items-center justify-center py-12">

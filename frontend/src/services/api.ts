@@ -56,6 +56,13 @@ export interface MessageResponse {
   timestamp: string;
 }
 
+export interface QuestionResponse {
+  answer: string;
+  is_edit?: boolean;
+  editedPdfUrl?: string;
+  changes?: string;
+}
+
 export const signup = async (email: string, password: string, name: string): Promise<AuthResponse> => {
   const response = await api.post('/signup', {
     name,
@@ -106,9 +113,9 @@ export const fetchDocuments = async (): Promise<DocumentResponse[]> => {
   return response.data;
 };
 
-export const askQuestion = async (documentId: number, question: string) => {
+export const askQuestion = async (documentId: number, question: string): Promise<QuestionResponse> => {
   try {
-    const response = await api.post('/ask', {
+    const response = await api.post<QuestionResponse>('/ask', {
       id: documentId,
       question,
     });

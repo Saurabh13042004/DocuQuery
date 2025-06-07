@@ -5,6 +5,7 @@ export interface MessageType {
     isUser: boolean;
     sourcePdf?: string;
     citations?: string[];
+    editedPdfUrl?: string; // Add this field for edited PDF URLs
   }
   
   export interface DocumentType {
@@ -15,8 +16,8 @@ export interface MessageType {
   updatedAt: string;
   pageCount: number;
   starred: boolean;
-  folder?: string;
-  shared?: boolean;
+  folder: string;
   messages: MessageType[];
-  filePath?: string; // Add this to store the backend file path
+  filePath: string;
+  editedVersion?: string; // Add this to track the latest edited version
 }

@@ -8,9 +8,10 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 
 interface PdfViewerProps {
   document: DocumentType;
+  customPdfUrl?: string; // Add this prop to allow viewing edited PDFs
 }
 
-const PdfViewer: React.FC<PdfViewerProps> = ({ document }) => {
+const PdfViewer: React.FC<PdfViewerProps> = ({ document, customPdfUrl }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [zoom, setZoom] = useState(100);
   const [showThumbnails, setShowThumbnails] = useState(false);
@@ -19,7 +20,18 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ document }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (document.filePath) {
+    // If customPdfUrl is provided, use it instead of the document's filePath
+    if (customPdfUrl) {
+      const baseUrl = 'http://127.0.0.1:8000';
+      const url = customPdfUrl.startsWith('http') 
+        ? customPdfUrl 
+        : `${baseUrl}${customPdfUrl}`;
+      
+      setPdfUrl(url);
+      // Reset to page 1 when loading a new PDF
+      setCurrentPage(1);
+    }
+    else if (document.filePath) {
       // For development environment, filePath is a local path
       const baseUrl = 'http://127.0.0.1:8000';
       const url = document.filePath.startsWith('http')
@@ -28,7 +40,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ document }) => {
 
       setPdfUrl(url);
     }
-  }, [document]);
+  }, [document, customPdfUrl]);
 
   const handlePrevPage = () => {
     if (currentPage > 1) {

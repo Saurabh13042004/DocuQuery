@@ -11,6 +11,51 @@ import { AuthProvider } from './context/AuthContext';
 import { SearchProvider } from './context/SearchContext';
 import ProtectedRoute from './ProtectedRoute';
 import ProfilePage from './pages/ProfilePage';
+
+// Placeholder pages for new routes
+const ChatHistoryPage = () => (
+  <div className="p-8">
+    <h1 className="text-2xl font-bold mb-4">Chat History</h1>
+    <p className="text-gray-600">View your conversation history with all documents.</p>
+  </div>
+);
+
+const TrashPage = () => (
+  <div className="p-8">
+    <h1 className="text-2xl font-bold mb-4">Trash</h1>
+    <p className="text-gray-600">Documents moved to trash appear here. They will be permanently deleted after 30 days.</p>
+  </div>
+);
+
+const SettingsPage = () => (
+  <div className="p-8">
+    <h1 className="text-2xl font-bold mb-4">Settings</h1>
+    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+      <h2 className="text-lg font-medium mb-4">Application Settings</h2>
+      <div className="space-y-4">
+        <div>
+          <label className="flex items-center space-x-2">
+            <input type="checkbox" className="h-4 w-4 rounded text-indigo-600" />
+            <span className="text-sm text-gray-700">Enable dark mode</span>
+          </label>
+        </div>
+        <div>
+          <label className="flex items-center space-x-2">
+            <input type="checkbox" className="h-4 w-4 rounded text-indigo-600" defaultChecked />
+            <span className="text-sm text-gray-700">Show document previews</span>
+          </label>
+        </div>
+        <div>
+          <label className="flex items-center space-x-2">
+            <input type="checkbox" className="h-4 w-4 rounded text-indigo-600" defaultChecked />
+            <span className="text-sm text-gray-700">Send email notifications</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 function App() {
   return (
     <Router>
@@ -31,8 +76,10 @@ function App() {
           }>
             <Route index element={<Dashboard />} />
             <Route path="chat/:id" element={<ChatView />} />
-            {/* Add a placeholder for the profile route */}
-            <Route path="profile" element={<div className="p-8"><h1 className="text-2xl font-bold">Profile Page</h1><p className="mt-4">User profile page is under construction.</p></div>} />
+            <Route path="profile" element={<ProfilePage />} />
+            <Route path="chat-history" element={<ChatHistoryPage />} />
+            <Route path="trash" element={<TrashPage />} />
+            <Route path="settings" element={<SettingsPage />} />
           </Route>
         </Routes>
       </AuthProvider>
