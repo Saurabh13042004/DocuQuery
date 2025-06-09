@@ -234,20 +234,67 @@ async def edit_pdf(file_path: str, instruction: str):
                             font_name = span["font"]
                             font_size = span["size"]
                             font_color = span["color"]
-                            is_bold = span["flags"] & 2 > 0  # Check bold flag
-                            is_italic = span["flags"] & 4 > 0  # Check italic flag
-                            
+                            flags = span["flags"]  # Contains bold/italic info
+
                             # Get the rectangle coordinates for this text
                             rect = fitz.Rect(span["bbox"])
-                            
-                            # Create a redaction annotation to remove the old text
-                            annot = page.add_redact_annot(rect, text=new_text)
-                            
-                            # Apply the redaction - removed the invalid text_color parameter
+
+                            # Redact the original text
+                            page.add_redact_annot(rect)
                             page.apply_redactions()
+
+                            # Convert color to the format expected by PyMuPDF
+                            if isinstance(font_color, int):
+                                r = (font_color >> 16) & 0xff
+                                g = (font_color >> 8) & 0xff
+                                b = font_color & 0xff
+                                color = (r/255, g/255, b/255)
+                            else:
+                                color = font_color
+
+                            # Determine font based on flags
+                            if flags & 16:  # Bold flag (2^4)
+                                font_name = "Helvetica-Bold"
+                            elif flags & 2:  # Italic flag (2^1)
+                                font_name = "Helvetica-Oblique"
+                            else:
+                                font_name = "Helvetica"
+
+                            # Calculate baseline position for proper vertical alignment
+                            # Use the bottom-left corner of the bounding box
+                            # Add 1 point to position at the baseline
+                            baseline_point = fitz.Point(rect.x0, rect.y1 - 1)
                             
-                            changes_made = True
-    
+                            print(f"Inserting text at baseline position ({baseline_point.x}, {baseline_point.y})")
+                            
+                            try:
+                                # Insert the text at the baseline position
+                                page.insert_text(
+                                    baseline_point,
+                                    new_text,
+                                    fontname=font_name,
+                                    fontsize=font_size,
+                                    color=color,
+                                    render_mode=0  # Normal rendering
+                                )
+                                changes_made = True
+                            except Exception as e:
+                                print(f"Error inserting text: {e}")
+                                # Fallback to textbox insertion
+                                try:
+                                    page.insert_textbox(
+                                        rect,
+                                        new_text,
+                                        fontname=font_name,
+                                        fontsize=font_size,
+                                        color=color,
+                                        render_mode=0,
+                                        align=0
+                                    )
+                                    changes_made = True
+                                except Exception as e2:
+                                    print(f"Textbox insertion also failed: {e2}")
+
     if not changes_made:
         if environment == "production" and file_path.startswith("http"):
             os.unlink(local_path)
