@@ -1,982 +1,847 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
-  MessageSquare, FileText, Zap, Shield, ChevronRight, 
-  FolderOpen, History, Trash2, ArrowRight, Check, 
-  RefreshCw, ExternalLink, Mail, Upload, Search,
-  Star, Download, Users, Globe, UserPlus, Lock,
-  Settings, Eye, Edit3, Share2, Cloud, Database,
-  Cpu, Brain, FileSpreadsheet, Presentation,
-  BookOpen, Image, Video, Music, X, Plus
+  MessageSquare, FileText, Shield, ArrowRight, 
+  Check, Upload, Star, Users, Globe, 
+  Headphones, Mail, Edit3,
+  ChevronDown, ChevronUp, Zap, Lock, Play,
+  Database, Brain, BookOpen
 } from 'lucide-react';
 
-const App: React.FC = () => {
+const LandingPage: React.FC = () => {
   const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
-  const [isSubmitted, setIsSubmitted] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const [showBetaPopup, setShowBetaPopup] = useState(false);
+  const [activeFeature, setActiveFeature] = useState(0);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
     };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY });
-    };
-
     window.addEventListener('scroll', handleScroll);
-    window.addEventListener('mousemove', handleMouseMove);
-    
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('mousemove', handleMouseMove);
-    };
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (email && name) {
-      setIsSubmitted(true);
+    if (email) {
+      // Handle email submission
       setEmail('');
-      setName('');
-      setTimeout(() => {
-        setIsSubmitted(false);
-        setShowBetaPopup(false);
-      }, 3000);
     }
   };
 
-  const handleJoinBeta = () => {
-    setShowBetaPopup(true);
-  };
-
-  const handleFooterClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    // Redirect to coming soon page
-    window.location.href = '#coming-soon';
-  };
-
-  // Animated Dashboard Mockup Component
-  const DashboardMockup = () => (
-    <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
-      {/* Header */}
-      <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="w-3 h-3 bg-red-400 rounded-full"></div>
-          <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-          <div className="w-3 h-3 bg-green-400 rounded-full"></div>
-        </div>
-        <div className="text-sm text-gray-500">DocuQuery Dashboard</div>
-      </div>
-      
-      {/* Content */}
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">My Documents</h3>
-          <div className="flex space-x-2">
-            <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
-              <Upload className="w-4 h-4 text-indigo-600" />
-            </div>
-            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
-              <Plus className="w-4 h-4 text-gray-600" />
-            </div>
-          </div>
-        </div>
-        
-        {/* Document List */}
-        <div className="space-y-3">
-          {[
-            { name: 'Project Proposal.pdf', size: '2.4 MB', status: 'processing', icon: FileText, color: 'text-red-600 bg-red-100' },
-            { name: 'Financial Report.xlsx', size: '1.8 MB', status: 'ready', icon: FileSpreadsheet, color: 'text-green-600 bg-green-100' },
-            { name: 'Presentation.pptx', size: '3.2 MB', status: 'ready', icon: Presentation, color: 'text-blue-600 bg-blue-100' },
-            { name: 'Research Notes.docx', size: '1.1 MB', status: 'ready', icon: BookOpen, color: 'text-purple-600 bg-purple-100' }
-          ].map((doc, index) => (
-            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200">
-              <div className="flex items-center space-x-3">
-                <div className={`w-10 h-10 ${doc.color} rounded-lg flex items-center justify-center`}>
-                  <doc.icon className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="font-medium text-gray-900">{doc.name}</div>
-                  <div className="text-sm text-gray-500">{doc.size}</div>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                {doc.status === 'processing' ? (
-                  <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                ) : (
-                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                )}
-                <MessageSquare className="w-4 h-4 text-gray-400 hover:text-indigo-600 cursor-pointer transition-colors" />
-                <Edit3 className="w-4 h-4 text-gray-400 hover:text-indigo-600 cursor-pointer transition-colors" />
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        {/* Create New Document */}
-        <div className="mt-4 p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-400 transition-colors cursor-pointer">
-          <div className="flex items-center justify-center space-x-2 text-gray-500 hover:text-indigo-600">
-            <Plus className="w-4 h-4" />
-            <span className="text-sm font-medium">Create new document from prompt</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Chat Interface Mockup
-  const ChatMockup = () => (
-    <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
-      <div className="bg-indigo-600 px-6 py-4 text-white">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-            <MessageSquare className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="font-medium">Chat with Financial Report.xlsx</div>
-            <div className="text-sm text-indigo-200">AI Assistant • Online</div>
-          </div>
-        </div>
-      </div>
-      
-      <div className="p-6 space-y-4 h-80 overflow-hidden">
-        <div className="flex justify-start">
-          <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-2 max-w-xs">
-            <p className="text-sm text-gray-800">Edit the Q3 revenue section to show 25% growth instead</p>
-          </div>
-        </div>
-        
-        <div className="flex justify-end">
-          <div className="bg-indigo-600 text-white rounded-2xl rounded-br-md px-4 py-2 max-w-xs">
-            <p className="text-sm">I've updated the Q3 revenue section to reflect 25% growth. The changes have been applied to cells B15-B18.</p>
-          </div>
-        </div>
-        
-        <div className="flex justify-start">
-          <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-2 max-w-xs">
-            <p className="text-sm text-gray-800">Can you suggest improvements for next quarter?</p>
-          </div>
-        </div>
-        
-        <div className="flex justify-end">
-          <div className="bg-indigo-600 text-white rounded-2xl rounded-br-md px-4 py-2 max-w-xs">
-            <div className="flex items-center space-x-2 mb-2">
-              <Brain className="w-4 h-4" />
-              <span className="text-xs font-medium">AI Suggestion</span>
-            </div>
-            <p className="text-sm">Based on the data, I suggest focusing on customer retention (currently 78%) and expanding the enterprise segment which shows 45% higher margins.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Enhanced Folder Organization Mockup
-  const FolderMockup = () => (
-    <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">Team Workspace</h3>
-          <div className="flex items-center space-x-2">
-            <div className="flex -space-x-2">
-              <div className="w-6 h-6 bg-blue-500 rounded-full border-2 border-white"></div>
-              <div className="w-6 h-6 bg-green-500 rounded-full border-2 border-white"></div>
-              <div className="w-6 h-6 bg-purple-500 rounded-full border-2 border-white"></div>
-            </div>
-            <span className="text-sm text-gray-500">+5 members</span>
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-4">
-          {[
-            { name: 'Projects', count: 12, color: 'bg-blue-100 text-blue-600', access: 'Team Lead' },
-            { name: 'Reports', count: 8, color: 'bg-green-100 text-green-600', access: 'All Members' },
-            { name: 'Contracts', count: 15, color: 'bg-purple-100 text-purple-600', access: 'Admin Only' },
-            { name: 'Research', count: 6, color: 'bg-orange-100 text-orange-600', access: 'Researchers' }
-          ].map((folder, index) => (
-            <div key={index} className="group p-4 border border-gray-200 rounded-xl hover:border-indigo-300 hover:shadow-md transition-all duration-200 cursor-pointer">
-              <div className="flex items-center justify-between mb-2">
-                <div className={`w-10 h-10 ${folder.color} rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-200`}>
-                  <FolderOpen className="w-5 h-5" />
-                </div>
-                <div className="text-xs text-gray-500">{folder.count} files</div>
-              </div>
-              <div className="font-medium text-gray-900 mb-1">{folder.name}</div>
-              <div className="flex items-center text-xs text-gray-500">
-                <Lock className="w-3 h-3 mr-1" />
-                {folder.access}
-              </div>
-            </div>
-          ))}
-        </div>
-        
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <UserPlus className="w-4 h-4 text-indigo-600" />
-              <span className="text-sm font-medium text-gray-700">Invite team members</span>
-            </div>
-            <button className="text-indigo-600 text-sm hover:text-indigo-700">Manage Access</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Integration Cards Component
-  const IntegrationCard = ({ icon: Icon, name, description, status, delay }: any) => (
-    <div 
-      className="animate-fade-in-up opacity-0 bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100 hover:border-indigo-200 group"
-      style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-3">
-          <div className="w-12 h-12 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-            <Icon className="w-6 h-6 text-indigo-600" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-gray-900">{name}</h3>
-            <p className="text-sm text-gray-500">{description}</p>
-          </div>
-        </div>
-        <div className={`w-3 h-3 rounded-full ${status === 'active' ? 'bg-green-400 animate-pulse' : 'bg-gray-300'}`}></div>
-      </div>
-    </div>
-  );
-
-  // Beta Popup Component
-  const BetaPopup = () => (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-2xl font-bold text-gray-900">Join Beta Program</h3>
-          <button 
-            onClick={() => setShowBetaPopup(false)}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-        
-        {!isSubmitted ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Enter your full name"
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email address"
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                required
-              />
-            </div>
-            <button
-              type="submit"
-              className="w-full bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-indigo-700 transition-colors duration-200"
-            >
-              Join Beta
-            </button>
-          </form>
-        ) : (
-          <div className="text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Check className="w-8 h-8 text-green-600" />
-            </div>
-            <h4 className="text-xl font-semibold text-gray-900 mb-2">Welcome to the beta!</h4>
-            <p className="text-gray-600">We'll send you access details soon.</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
   return (
-    <div className="min-h-screen bg-white overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div 
-          className="absolute w-96 h-96 bg-gradient-to-r from-indigo-400/10 to-purple-400/10 rounded-full blur-3xl"
-          style={{
-            transform: `translate(${mousePosition.x * 0.02}px, ${mousePosition.y * 0.02}px)`,
-            transition: 'transform 0.1s ease-out'
-          }}
-        />
-        <div 
-          className="absolute top-1/2 right-0 w-96 h-96 bg-gradient-to-r from-pink-400/10 to-orange-400/10 rounded-full blur-3xl"
-          style={{
-            transform: `translate(${mousePosition.x * -0.01}px, ${mousePosition.y * -0.01}px)`,
-            transition: 'transform 0.1s ease-out'
-          }}
-        />
-      </div>
-
-      {/* Coming Soon Banner */}
-      <div className="relative z-40 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-center py-3 px-4 overflow-hidden">
-        <div className="absolute inset-0 bg-white/10 animate-pulse"></div>
-        <p className="relative text-sm font-medium">
-          🚀 <span className="font-bold">Coming Soon</span> - Join our exclusive beta program and be first to experience the future
-        </p>
-      </div>
-
-      {/* Fixed Navigation */}
-      <nav className={`fixed top-12 left-0 right-0 z-30 transition-all duration-500 ${isScrolled ? 'bg-white/95 backdrop-blur-md shadow-lg py-3' : 'bg-transparent py-5'}`}>
-        <div className="container mx-auto px-6 flex items-center justify-between">
-          <div className="flex items-center group">
-            <div className="bg-indigo-600 text-white p-2 rounded-xl group-hover:scale-110 transition-transform duration-200">
-              <FileText className="h-8 w-8" />
+    <div className="min-h-screen bg-white">
+      {/* Navigation */}
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isScrolled ? 'bg-white/95 backdrop-blur-sm shadow-sm' : 'bg-transparent'
+      }`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <FileText className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xl font-bold text-gray-900">DocuQuery</span>
             </div>
-            <span className="ml-3 text-2xl font-bold text-gray-900">DocuQuery</span>
-          </div>
-          <div className="hidden md:flex items-center space-x-8">
-            <a href="#features" className="text-gray-600 hover:text-indigo-600 font-medium transition-colors duration-200 relative group">
-              Features
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-indigo-600 transition-all duration-200 group-hover:w-full"></span>
-            </a>
-            <a href="#integrations" className="text-gray-600 hover:text-indigo-600 font-medium transition-colors duration-200 relative group">
-              Integrations
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-indigo-600 transition-all duration-200 group-hover:w-full"></span>
-            </a>
-            <a href="#how-it-works" className="text-gray-600 hover:text-indigo-600 font-medium transition-colors duration-200 relative group">
-              How It Works
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-indigo-600 transition-all duration-200 group-hover:w-full"></span>
-            </a>
-            <a href="#beta" className="text-gray-600 hover:text-indigo-600 font-medium transition-colors duration-200 relative group">
-              Beta
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-indigo-600 transition-all duration-200 group-hover:w-full"></span>
-            </a>
-            <button 
-              onClick={handleJoinBeta}
-              className="px-6 py-2 rounded-full bg-indigo-600 text-white font-medium hover:bg-indigo-700 hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl"
-            >
-              Join Beta
-            </button>
+            
+            <div className="hidden md:flex items-center space-x-8">
+              <a href="#features" className="text-gray-600 hover:text-gray-900 transition-colors">Features</a>
+              <a href="#integrations" className="text-gray-600 hover:text-gray-900 transition-colors">Integrations</a>
+              <a href="#pricing" className="text-gray-600 hover:text-gray-900 transition-colors">Pricing</a>
+              <a href="#docs" className="text-gray-600 hover:text-gray-900 transition-colors">Docs</a>
+              <Link to="/login" className="text-gray-600 hover:text-gray-900 transition-colors">Login</Link>
+              <Link to="/signup" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                Sign up
+              </Link>
+            </div>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 bg-gradient-to-br from-gray-50 via-white to-indigo-50">
-        <div className="container mx-auto px-6">
-          <div className="flex flex-col md:flex-row items-center">
-            <div className="md:w-1/2 mb-10 md:mb-0">
-              <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}>
-                <div className="inline-flex items-center bg-indigo-100 text-indigo-700 rounded-full px-4 py-2 mb-6 animate-bounce">
-                  <Zap className="w-4 h-4 mr-2" />
-                  <span className="text-sm font-medium">Powered by Google Gemini AI</span>
-                </div>
+      <section className="relative pt-32 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        {/* Animated Glassmorphism Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+          <div className="absolute top-20 left-20 w-72 h-72 bg-blue-400/20 rounded-full mix-blend-multiply filter blur-xl animate-blob"></div>
+          <div className="absolute top-40 right-20 w-72 h-72 bg-purple-400/20 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000"></div>
+          <div className="absolute -bottom-8 left-40 w-72 h-72 bg-pink-400/20 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-4000"></div>
+        </div>
+        
+        {/* Content */}
+        <div className="relative z-10 max-w-6xl mx-auto text-center">
+          {/* <div className="mb-8">
+            <span className="text-blue-600 text-sm font-semibold tracking-wider uppercase">
+              AI Document Processing
+            </span>
+          </div> */}
+          
+          <h1 className="text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
+            Chat & <span className="text-blue-600 relative">
+              Edit
+              {/* <Edit3 className="w-8 h-8 text-blue-500 absolute -top-2 -right-10" /> */}
+            </span>{' '}
+            your documents instantly
+          </h1>
+          
+          <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-4xl mx-auto leading-relaxed">
+            The world's first AI that lets you <strong>edit PDFs while chatting</strong>. 
+            Say "Change name from John to Adam" and watch it happen in 1-2 seconds. 
+            Plus convert to audiobooks and integrate with your favorite tools.
+          </p>
+          
+          {/* USP Highlight */}
+          <div className="glassmorphism-card mx-auto mb-12 max-w-2xl p-6 bg-white/30 backdrop-blur-md border border-white/20 rounded-2xl shadow-lg">
+            <div className="flex items-center justify-center space-x-4 text-gray-800">
+              <div className="flex items-center space-x-2">
+                <Zap className="w-5 h-5 text-yellow-500" />
+                <span className="font-semibold">Real-time PDF Editing</span>
               </div>
-              
-              <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '200ms', animationFillMode: 'forwards' }}>
-                <h1 className="text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
-                  The New Standard
-                  <br />
-                  <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                    for Document Chat
-                  </span>
-                </h1>
+              <div className="w-px h-6 bg-gray-300"></div>
+              <div className="flex items-center space-x-2">
+                <MessageSquare className="w-5 h-5 text-blue-500" />
+                <span className="font-semibold">AI Conversations</span>
               </div>
-              
-              <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '400ms', animationFillMode: 'forwards' }}>
-                <p className="text-xl md:text-2xl text-gray-600 mb-6 leading-relaxed">
-                  No more lengthy messages. No more reading endless documents.
-                </p>
-                <p className="text-lg text-gray-500 mb-8">
-                  Chat with any document - PDFs, Word docs, Excel sheets, PowerPoints, notebooks, and more. Edit documents by simple queries, organize with team collaboration, and experience AI-powered document management like never before.
-                </p>
-              </div>
-              
-              <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '600ms', animationFillMode: 'forwards' }}>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <button 
-                    onClick={handleJoinBeta}
-                    className="group px-8 py-4 rounded-full bg-indigo-600 text-white text-lg font-medium hover:bg-indigo-700 transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:-translate-y-1 flex items-center justify-center"
-                  >
-                    Join Beta
-                    <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform duration-200" />
-                  </button>
-                  <button className="px-8 py-4 rounded-full bg-white text-indigo-600 text-lg font-medium border-2 border-indigo-600 hover:bg-indigo-50 transition-all duration-200 shadow-lg hover:shadow-xl">
-                    Watch Demo
-                  </button>
-                </div>
-              </div>
-            </div>
-            
-            <div className="md:w-1/2 md:pl-10">
-              <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '800ms', animationFillMode: 'forwards' }}>
-                <div className="relative">
-                  <div className="absolute inset-0 bg-gradient-to-tr from-indigo-100 to-purple-100 transform rotate-3 rounded-3xl animate-pulse"></div>
-                  <div className="relative z-10 transform hover:scale-105 transition-transform duration-300">
-                    <DashboardMockup />
-                  </div>
-                  <div className="absolute -bottom-4 -right-4 bg-indigo-600 text-white p-4 rounded-full shadow-lg z-20 animate-bounce">
-                    <MessageSquare className="h-6 w-6" />
-                  </div>
-                </div>
+              <div className="w-px h-6 bg-gray-300"></div>
+              <div className="flex items-center space-x-2">
+                <Headphones className="w-5 h-5 text-purple-500" />
+                <span className="font-semibold">Audio Generation</span>
               </div>
             </div>
+          </div>
+
+          {/* Email Signup */}
+          <div className="max-w-md mx-auto mb-16">
+            <form onSubmit={handleSubmit} className="flex bg-gray-100 rounded-2xl p-2">
+              <div className="flex-1 flex items-center px-4">
+                <Mail className="w-5 h-5 text-gray-400 mr-3" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Your email address"
+                  className="flex-1 bg-transparent border-none outline-none text-gray-900 placeholder-gray-500"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                className="bg-blue-600 text-white px-8 py-3 rounded-xl hover:bg-blue-700 transition-all duration-200 font-medium"
+              >
+                Get Started
+              </button>
+            </form>
           </div>
         </div>
       </section>
-      
-      {/* Trusted By Section */}
-      <section className="py-16 border-t border-b border-gray-100 bg-white">
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-8">
-            <p className="text-sm text-gray-500 font-medium">TRUSTED BY TEAMS AT</p>
+
+      {/* Interactive Features Section */}
+      <section id="features" className="py-20 bg-gray-900 text-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <span className="text-blue-400 text-sm font-semibold tracking-wider uppercase">
+              Powerful Features
+            </span>
+            <h2 className="text-4xl md:text-5xl font-bold mt-4 mb-6">
+              Features that you{' '}
+              <span className="text-blue-400">📝</span>{' '}
+              need.
+            </h2>
+            <p className="text-xl text-gray-300 max-w-3xl mx-auto">
+              Transform documents that normally take hours to process, in minutes. 
+              Real-time PDF editing while chatting. Document conversion in 2 minutes. 
+              Cloud sync in 2 minutes. You get the idea.
+            </p>
           </div>
-          <div className="flex flex-wrap justify-center items-center gap-12 opacity-60">
-            {['Google', 'Microsoft', 'Slack', 'Netflix', 'Spotify', 'Amazon'].map((company, index) => (
-              <div key={company} className="animate-fade-in-up opacity-0" style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'forwards' }}>
-                <div className="text-2xl font-bold text-gray-400 hover:text-gray-600 transition-colors duration-200 cursor-pointer">
-                  {company}
-                </div>
-              </div>
+
+          {/* Interactive Feature Pills */}
+          <div className="flex flex-wrap justify-center gap-4 mb-16">
+            {[
+              { id: 0, icon: Upload, label: 'Upload Files' },
+              { id: 1, icon: MessageSquare, label: 'AI Conversations' },
+              { id: 2, icon: Shield, label: 'Data Protection' },
+              { id: 3, icon: Headphones, label: 'Audio Generation' }
+            ].map((feature) => (
+              <button
+                key={feature.id}
+                onClick={() => setActiveFeature(feature.id)}
+                className={`px-6 py-3 rounded-full flex items-center space-x-2 transition-all duration-300 ${
+                  activeFeature === feature.id
+                    ? 'bg-blue-600 text-white shadow-lg scale-105'
+                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                }`}
+              >
+                <feature.icon className="w-5 h-5" />
+                <span>{feature.label}</span>
+              </button>
             ))}
           </div>
-        </div>
-      </section>
 
-      {/* Integrations Section */}
-      <section id="integrations" className="py-24 bg-gradient-to-br from-blue-50 to-indigo-50">
-        <div className="container mx-auto px-6">
-          <div className="max-w-4xl mx-auto text-center mb-16">
-            <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}>
-              <div className="inline-flex items-center bg-blue-100 text-blue-700 rounded-full px-6 py-2 mb-8">
-                <Cloud className="w-4 h-4 mr-2" />
-                <span className="text-sm font-medium">Enterprise-Grade Integrations</span>
-              </div>
-            </div>
-            
-            <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '200ms', animationFillMode: 'forwards' }}>
-              <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-                Powered by the best in class
-              </h2>
-            </div>
-            
-            <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '400ms', animationFillMode: 'forwards' }}>
-              <p className="text-xl text-gray-600 leading-relaxed">
-                Built on Google's secure infrastructure with enterprise-grade privacy and AI capabilities
-              </p>
-            </div>
-          </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
-            <IntegrationCard 
-              icon={Brain} 
-              name="Google Gemini" 
-              description="Advanced AI processing" 
-              status="active" 
-              delay={600}
-            />
-            <IntegrationCard 
-              icon={Cloud} 
-              name="Google Cloud" 
-              description="Secure infrastructure" 
-              status="active" 
-              delay={700}
-            />
-            <IntegrationCard 
-              icon={Globe} 
-              name="Google Drive" 
-              description="Document synchronization" 
-              status="active" 
-              delay={800}
-            />
-            <IntegrationCard 
-              icon={Database} 
-              name="AWS" 
-              description="Scalable storage" 
-              status="active" 
-              delay={900}
-            />
-          </div>
-
-          {/* Why Google Section */}
-          <div className="bg-white rounded-3xl p-8 md:p-12 shadow-xl border border-gray-100">
-            <div className="grid md:grid-cols-2 gap-12 items-center">
-              <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '1000ms', animationFillMode: 'forwards' }}>
-                <div className="flex items-center mb-6">
-                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mr-4">
-                    <Shield className="w-6 h-6 text-green-600" />
+          {/* Dynamic Feature Content */}
+          <div className="glassmorphism-card bg-gray-800/50 backdrop-blur-md border border-gray-700/50 rounded-3xl p-8">
+            {activeFeature === 0 && (
+              <div className="grid md:grid-cols-2 gap-8 items-center">
+                <div>
+                  <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-6">
+                    <Upload className="w-8 h-8 text-white" />
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-900">Why Google?</h3>
+                  <h3 className="text-3xl font-bold mb-4">Smart File Upload</h3>
+                  <p className="text-gray-300 text-lg mb-6">
+                    Drag and drop any document format. Our AI automatically processes PDFs, Word docs, 
+                    PowerPoint presentations, and more. Advanced OCR for scanned documents.
+                  </p>
+                  <ul className="space-y-2 text-gray-300">
+                    <li className="flex items-center space-x-2">
+                      <Check className="w-4 h-4 text-green-500" />
+                      <span>Supports 50+ file formats</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <Check className="w-4 h-4 text-green-500" />
+                      <span>Advanced OCR for scanned documents</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <Check className="w-4 h-4 text-green-500" />
+                      <span>Batch upload up to 100 files</span>
+                    </li>
+                  </ul>
                 </div>
-                <p className="text-lg text-gray-600 mb-6">
-                  We chose Google's ecosystem for unmatched security, privacy, and AI capabilities. Your documents are protected by the same infrastructure that secures billions of users worldwide.
-                </p>
-                <div className="space-y-4">
-                  {[
-                    { icon: Shield, text: "Enterprise-grade security and encryption" },
-                    { icon: Lock, text: "GDPR compliant with zero data retention" },
-                    { icon: Eye, text: "Complete transparency in data processing" },
-                    { icon: Cpu, text: "Advanced AI with responsible development" }
-                  ].map((item, index) => (
-                    <div key={index} className="flex items-center">
-                      <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
-                        <item.icon className="w-4 h-4 text-green-600" />
-                      </div>
-                      <span className="text-gray-700">{item.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '1200ms', animationFillMode: 'forwards' }}>
-                <div className="bg-gradient-to-br from-green-100 to-blue-100 rounded-2xl p-8">
-                  <div className="text-center mb-6">
-                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                      <Brain className="w-8 h-8 text-indigo-600" />
-                    </div>
-                    <h4 className="text-xl font-bold text-gray-900 mb-2">Hybrid AI Feature</h4>
-                    <p className="text-gray-600">
-                      Our AI doesn't just answer questions - it proactively suggests improvements, identifies patterns, and recommends actions based on your document content.
-                    </p>
-                  </div>
-                  <div className="bg-white rounded-lg p-4 shadow-sm">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                      <span className="text-sm font-medium text-gray-700">AI Suggestion</span>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      "Based on your quarterly reports, I notice a 15% increase in customer acquisition costs. Would you like me to analyze the marketing spend breakdown?"
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-      
-      {/* Features Highlight Section */}
-      <section id="features" className="py-24 bg-gradient-to-br from-orange-500 to-red-500 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/10"></div>
-        <div className="container mx-auto px-6 relative z-10">
-          <div className="max-w-4xl mx-auto text-center mb-16">
-            <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}>
-              <div className="inline-flex items-center bg-white/20 rounded-full px-6 py-2 mb-8">
-                <span className="text-sm font-medium">Documents are inevitable. Confusion isn't.</span>
-              </div>
-            </div>
-            
-            <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '200ms', animationFillMode: 'forwards' }}>
-              <h2 className="text-4xl md:text-5xl font-bold mb-6">
-                From chaos to clarity in seconds
-              </h2>
-            </div>
-            
-            <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '400ms', animationFillMode: 'forwards' }}>
-              <p className="text-xl opacity-90 leading-relaxed">
-                DocuQuery transforms how you interact with any document type. No more endless scrolling, 
-                no more searching through pages. Just ask, edit, and get instant, intelligent responses.
-              </p>
-            </div>
-          </div>
-          
-          <div className="grid md:grid-cols-2 gap-16 items-center">
-            <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '600ms', animationFillMode: 'forwards' }}>
-              <div className="transform hover:scale-105 transition-transform duration-300">
-                <ChatMockup />
-              </div>
-            </div>
-            
-            <div className="space-y-8">
-              <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '800ms', animationFillMode: 'forwards' }}>
-                <div className="bg-white/10 backdrop-blur-sm p-6 rounded-2xl hover:bg-white/20 transition-all duration-300">
-                  <div className="flex items-center mb-4">
-                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mr-4">
-                      <MessageSquare className="h-6 w-6" />
-                    </div>
-                    <h3 className="text-xl font-semibold">Universal Document Chat & Edit</h3>
-                  </div>
-                  <p className="opacity-90">Chat with PDFs, Word docs, Excel sheets, PowerPoints, notebooks, and more. Edit documents by simple queries without manually reading each line.</p>
-                  <div className="flex items-center space-x-2 mt-3">
-                    {[FileText, FileSpreadsheet, Presentation, BookOpen, Image].map((Icon, index) => (
-                      <div key={index} className="w-6 h-6 bg-white/20 rounded flex items-center justify-center">
-                        <Icon className="w-3 h-3" />
+                <div className="bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl p-6 backdrop-blur-sm">
+                  <div className="space-y-3">
+                    {['Resume.pdf', 'Report.docx', 'Presentation.pptx'].map((file, index) => (
+                      <div key={index} className="flex items-center space-x-3 bg-white/10 rounded-lg p-3">
+                        <FileText className="w-8 h-8 text-blue-400" />
+                        <div className="flex-1">
+                          <div className="font-medium">{file}</div>
+                          <div className="text-sm text-gray-400">Processing...</div>
+                        </div>
+                        <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                          <Check className="w-4 h-4 text-white" />
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
-              
-              <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '1000ms', animationFillMode: 'forwards' }}>
-                <div className="bg-white/10 backdrop-blur-sm p-6 rounded-2xl hover:bg-white/20 transition-all duration-300">
-                  <div className="flex items-center mb-4">
-                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mr-4">
-                      <Plus className="h-6 w-6" />
-                    </div>
-                    <h3 className="text-xl font-semibold">Create Documents from Prompts</h3>
+            )}
+
+            {activeFeature === 1 && (
+              <div className="grid md:grid-cols-2 gap-8 items-center">
+                <div>
+                  <div className="w-16 h-16 bg-purple-600 rounded-2xl flex items-center justify-center mb-6">
+                    <MessageSquare className="w-8 h-8 text-white" />
                   </div>
-                  <p className="opacity-90">Generate new documents in any format by simple prompts. Create reports, presentations, spreadsheets, and more without starting from scratch.</p>
+                  <h3 className="text-3xl font-bold mb-4">AI Chat & Real-time Editing</h3>
+                  <p className="text-gray-300 text-lg mb-6">
+                    Our revolutionary AI doesn't just chat - it edits your PDFs in real-time. 
+                    Ask to change names, dates, or any content and watch it happen instantly.
+                  </p>
+                  <ul className="space-y-2 text-gray-300">
+                    <li className="flex items-center space-x-2">
+                      <Zap className="w-4 h-4 text-yellow-500" />
+                      <span>Real-time PDF editing while chatting</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <Brain className="w-4 h-4 text-purple-500" />
+                      <span>Advanced natural language processing</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <Edit3 className="w-4 h-4 text-blue-500" />
+                      <span>Instant document modifications</span>
+                    </li>
+                  </ul>
+                </div>
+                <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl p-6 backdrop-blur-sm">
+                  <div className="space-y-4">
+                    <div className="bg-blue-500 text-white rounded-2xl rounded-bl-sm p-3 ml-8">
+                      "Change the name from John to Adam in my resume"
+                    </div>
+                    <div className="bg-white/10 rounded-2xl rounded-br-sm p-3 mr-8">
+                      ✨ Done! I've updated all instances of 'John' to 'Adam' in your resume. The changes are highlighted for your review.
+                    </div>
+                    <div className="bg-blue-500 text-white rounded-2xl rounded-bl-sm p-3 ml-8">
+                      "Now update the phone number to +1-555-0123"
+                    </div>
+                  </div>
                 </div>
               </div>
-              
-              <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '1200ms', animationFillMode: 'forwards' }}>
-                <div className="bg-white/10 backdrop-blur-sm p-6 rounded-2xl hover:bg-white/20 transition-all duration-300">
-                  <div className="flex items-center mb-4">
-                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mr-4">
-                      <Brain className="h-6 w-6" />
-                    </div>
-                    <h3 className="text-xl font-semibold">Hybrid AI Suggestions</h3>
+            )}
+
+            {activeFeature === 2 && (
+              <div className="grid md:grid-cols-2 gap-8 items-center">
+                <div>
+                  <div className="w-16 h-16 bg-green-600 rounded-2xl flex items-center justify-center mb-6">
+                    <Shield className="w-8 h-8 text-white" />
                   </div>
-                  <p className="opacity-90">AI proactively suggests improvements, identifies patterns, and recommends actions based on your document content.</p>
+                  <h3 className="text-3xl font-bold mb-4">Enterprise-Grade Security</h3>
+                  <p className="text-gray-300 text-lg mb-6">
+                    Your documents are protected with military-grade encryption. 
+                    Zero-knowledge architecture ensures only you can access your content.
+                  </p>
+                  <ul className="space-y-2 text-gray-300">
+                    <li className="flex items-center space-x-2">
+                      <Check className="w-4 h-4 text-green-500" />
+                      <span>AES-256 encryption at rest</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <Check className="w-4 h-4 text-green-500" />
+                      <span>Zero-knowledge architecture</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <Check className="w-4 h-4 text-green-500" />
+                      <span>SOC 2 Type II compliant</span>
+                    </li>
+                  </ul>
+                </div>
+                <div className="bg-gradient-to-br from-green-500/20 to-blue-500/20 rounded-2xl p-6 backdrop-blur-sm">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white/10 rounded-lg p-4 text-center">
+                      <Lock className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                      <div className="font-semibold">Encrypted</div>
+                      <div className="text-sm text-gray-400">AES-256</div>
+                    </div>
+                    <div className="bg-white/10 rounded-lg p-4 text-center">
+                      <Shield className="w-8 h-8 text-blue-400 mx-auto mb-2" />
+                      <div className="font-semibold">Protected</div>
+                      <div className="text-sm text-gray-400">99.9% Uptime</div>
+                    </div>
+                    <div className="bg-white/10 rounded-lg p-4 text-center">
+                      <Database className="w-8 h-8 text-purple-400 mx-auto mb-2" />
+                      <div className="font-semibold">Backup</div>
+                      <div className="text-sm text-gray-400">3x Redundancy</div>
+                    </div>
+                    <div className="bg-white/10 rounded-lg p-4 text-center">
+                      <Check className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                      <div className="font-semibold">Compliant</div>
+                      <div className="text-sm text-gray-400">SOC 2</div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {activeFeature === 3 && (
+              <div className="grid md:grid-cols-2 gap-8 items-center">
+                <div>
+                  <div className="w-16 h-16 bg-orange-600 rounded-2xl flex items-center justify-center mb-6">
+                    <Headphones className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-3xl font-bold mb-4">AI-Powered Audiobooks</h3>
+                  <p className="text-gray-300 text-lg mb-6">
+                    Transform any document into a high-quality audiobook with natural-sounding AI voices. 
+                    Perfect for learning on the go or accessibility needs.
+                  </p>
+                  <ul className="space-y-2 text-gray-300">
+                    <li className="flex items-center space-x-2">
+                      <Check className="w-4 h-4 text-green-500" />
+                      <span>50+ natural AI voices</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <Check className="w-4 h-4 text-green-500" />
+                      <span>Multiple languages supported</span>
+                    </li>
+                    <li className="flex items-center space-x-2">
+                      <Check className="w-4 h-4 text-green-500" />
+                      <span>Adjustable speed and tone</span>
+                    </li>
+                  </ul>
+                </div>
+                <div className="bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-2xl p-6 backdrop-blur-sm">
+                  <div className="bg-white/10 rounded-xl p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center">
+                          <BookOpen className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <div className="font-semibold">Annual Report 2024.pdf</div>
+                          <div className="text-sm text-gray-400">Converting to audiobook...</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span>Voice: Sarah (Professional)</span>
+                        <span>Speed: 1.2x</span>
+                      </div>
+                      <div className="bg-gray-700 rounded-full h-2">
+                        <div className="bg-orange-500 rounded-full h-2" style={{ width: '75%' }}></div>
+                      </div>
+                      <div className="flex items-center justify-center space-x-4">
+                        <Play className="w-8 h-8 text-orange-400" />
+                        <span className="text-sm">3:42 / 15:30</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </section>
-      
-      {/* Enhanced Organization Section */}
-      <section className="py-24 bg-white">
-        <div className="container mx-auto px-6">
-          <div className="max-w-4xl mx-auto text-center mb-16">
-            <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}>
-              <div className="inline-flex justify-center items-center w-16 h-16 rounded-2xl bg-indigo-100 mb-8 mx-auto">
-                <FolderOpen className="h-8 w-8 text-indigo-600" />
+
+      {/* Collaboration Section */}
+      <section className="py-20 bg-gradient-to-br from-purple-50 to-blue-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mb-6">
+                <Users className="w-8 h-8 text-purple-600" />
               </div>
-            </div>
-            
-            <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '200ms', animationFillMode: 'forwards' }}>
-              <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-                Organization that <span className="italic text-indigo-600">actually works</span>
+              <h2 className="text-4xl font-bold text-gray-900 mb-6">
+                Better, together.
               </h2>
-            </div>
-            
-            <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '400ms', animationFillMode: 'forwards' }}>
-              <p className="text-xl text-gray-600 leading-relaxed">
-                Keep your documents organized, accessible, and always ready for intelligent conversations with advanced team collaboration features.
+              <p className="text-lg text-gray-600 mb-8">
+                Want to share your insights with your team? Well you might. 
+                Fortunately DocuQuery supports that. Invite your colleagues or 
+                team members to your workspace in seconds, then use 
+                DocuQuery together.
               </p>
+              <p className="text-lg text-gray-600 mb-8">
+                Join multiple teams with your account, have control over 
+                different projects.
+              </p>
+              <a href="#docs" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
+                See Documentation
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </a>
             </div>
-          </div>
-          
-          <div className="grid md:grid-cols-2 gap-16 items-center">
-            <div className="order-2 md:order-1">
-              <div className="space-y-8">
-                <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '600ms', animationFillMode: 'forwards' }}>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Smart Team Collaboration</h3>
-                  <p className="text-lg text-gray-600 mb-6">
-                    Create custom folders, organize by projects or teams, and manage access with role-based permissions. Keep your digital workspace clean, secure, and efficient.
-                  </p>
-                </div>
+
+            <div className="bg-white rounded-3xl shadow-xl p-8">
+              <div className="bg-purple-50 rounded-2xl p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <Users className="w-5 h-5 text-purple-600 mr-2" />
+                  Invite People
+                </h3>
+                <p className="text-gray-600 mb-4">Invite your members to join your workspace</p>
                 
-                <div className="space-y-6">
-                  {[
-                    { icon: FolderOpen, text: "Unlimited folders and subfolders", delay: '800ms' },
-                    { icon: Upload, text: "Drag and drop document management", delay: '1000ms' },
-                    { icon: Star, text: "Star important documents for quick access", delay: '1200ms' },
-                    { icon: Users, text: "Invite team members with role-based access", delay: '1400ms' }
-                  ].map((item, index) => (
-                    <div key={index} className="animate-fade-in-up opacity-0" style={{ animationDelay: item.delay, animationFillMode: 'forwards' }}>
-                      <div className="flex items-center group">
-                        <div className="flex-shrink-0 h-12 w-12 bg-indigo-100 rounded-xl flex items-center justify-center group-hover:bg-indigo-200 transition-colors duration-200">
-                          <item.icon className="h-6 w-6 text-indigo-600" />
+                <div className="flex mb-4">
+                  <input
+                    type="email"
+                    placeholder="Add email address"
+                    className="flex-1 px-4 py-2 border border-gray-200 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <button className="bg-blue-600 text-white px-6 py-2 rounded-r-lg hover:bg-blue-700">
+                    Send
+                  </button>
+                </div>
+
+                <div className="mb-4">
+                  <div className="text-sm font-medium text-gray-700 mb-2">Members (2/10)</div>
+                  
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-purple-200 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-medium text-purple-700">L</span>
                         </div>
-                        <p className="ml-4 text-gray-700 font-medium">{item.text}</p>
+                        <div>
+                          <div className="font-medium text-sm">Lisa Klausson (You)</div>
+                          <div className="text-xs text-gray-500">lisa@docuquery.com</div>
+                        </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            
-            <div className="order-1 md:order-2">
-              <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '600ms', animationFillMode: 'forwards' }}>
-                <div className="relative transform hover:scale-105 transition-transform duration-300">
-                  <div className="absolute inset-0 bg-gradient-to-tr from-pink-100 to-blue-100 transform -rotate-2 rounded-3xl"></div>
-                  <div className="relative z-10">
-                    <FolderMockup />
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-200 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-medium text-blue-700">O</span>
+                        </div>
+                        <div>
+                          <div className="font-medium text-sm">Oguz Yagiz Kara</div>
+                          <div className="text-xs text-gray-500">oguz@docuquery.com</div>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                        Invite Sent
+                      </span>
+                    </div>
                   </div>
                 </div>
+              </div>
+              
+              <div className="mt-6 flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 bg-gray-900 rounded-full flex items-center justify-center">
+                    <FileText className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="font-medium">DocuQuery</span>
+                </div>
+                <span className="text-sm text-gray-500">docuquery.com</span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Integration Section */}
-      <section className="py-24 bg-gray-50">
-        <div className="container mx-auto px-6">
-          <div className="grid md:grid-cols-2 gap-16 items-center">
-            <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}>
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-tr from-green-100 to-blue-100 transform rotate-2 rounded-3xl"></div>
-                <div className="relative z-10 bg-white rounded-2xl shadow-2xl p-8 border border-gray-200">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-semibold text-gray-900">Google Drive Integration</h3>
-                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <Globe className="w-4 h-4 text-blue-600" />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                        <span className="text-sm font-medium text-green-800">Syncing documents...</span>
-                      </div>
-                      <span className="text-xs text-green-600">24 files</span>
-                    </div>
-                    
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <Check className="w-4 h-4 text-green-600" />
-                        <span className="text-sm text-gray-700">Auto-sync enabled</span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <Check className="w-4 h-4 text-green-600" />
-                        <span className="text-sm text-gray-700">Real-time updates</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+      {/* Integrations Section */}
+      <section id="integrations" className="py-20 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <span className="text-blue-600 text-sm font-semibold tracking-wider uppercase">
+              Integrations
+            </span>
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mt-4 mb-6">
+              Works with your{' '}
+              <span className="text-blue-600">favorite tools</span>
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Seamlessly connect DocuQuery with the tools you already use. 
+              One-click integration with popular cloud storage and productivity platforms.
+            </p>
+          </div>
+
+          {/* Real Integration Logos */}
+          <div className="relative">
+            <div className="flex justify-center items-center flex-wrap gap-8 mb-12">
+              {/* Google Drive */}
+              <div className="w-24 h-24 bg-white shadow-lg rounded-2xl flex items-center justify-center hover:shadow-xl hover:scale-105 transition-all duration-300 group">
+                <img 
+                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/2295px-Google_Drive_icon_%282020%29.svg.png"
+                  alt="Google Drive"
+                  className="w-12 h-12 object-contain"
+                />
+              </div>
+
+              {/* OneDrive */}
+              <div className="w-24 h-24 bg-white shadow-lg rounded-2xl flex items-center justify-center hover:shadow-xl hover:scale-105 transition-all duration-300 group">
+                <img 
+                  src="https://logos-world.net/wp-content/uploads/2022/04/OneDrive-Symbol.png"
+                  alt="OneDrive"
+                  className="w-12 h-12 object-contain"
+                />
+              </div>
+
+              {/* Atlassian */}
+              <div className="w-24 h-24 bg-white shadow-lg rounded-2xl flex items-center justify-center hover:shadow-xl hover:scale-105 transition-all duration-300 group">
+                <img 
+                  src="https://logos-world.net/wp-content/uploads/2023/03/Atlassian-Logo.png"
+                  alt="Atlassian"
+                  className="w-12 h-12 object-contain"
+                />
+              </div>
+
+              {/* Zoho */}
+              <div className="w-24 h-24 bg-white shadow-lg rounded-2xl flex items-center justify-center hover:shadow-xl hover:scale-105 transition-all duration-300 group">
+                <img 
+                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/ZOHO_logo_2023.svg/2560px-ZOHO_logo_2023.svg.png"
+                  alt="Zoho"
+                  className="w-12 h-12 object-contain"
+                />
+              </div>
+
+              {/* AWS */}
+              <div className="w-24 h-24 bg-white shadow-lg rounded-2xl flex items-center justify-center hover:shadow-xl hover:scale-105 transition-all duration-300 group">
+                <img 
+                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/Amazon_Web_Services_Logo.svg/2560px-Amazon_Web_Services_Logo.svg.png"
+                  alt="Amazon Web Services"
+                  className="w-12 h-12 object-contain"
+                />
+              </div>
+
+              {/* Microsoft Azure */}
+              <div className="w-24 h-24 bg-white shadow-lg rounded-2xl flex items-center justify-center hover:shadow-xl hover:scale-105 transition-all duration-300 group">
+                <img 
+                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Microsoft_Azure.svg/2048px-Microsoft_Azure.svg.png"
+                  alt="Microsoft Azure"
+                  className="w-12 h-12 object-contain"
+                />
               </div>
             </div>
-            
-            <div>
-              <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '200ms', animationFillMode: 'forwards' }}>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                  Seamless Google Drive Integration
-                </h3>
-                <p className="text-lg text-gray-600 mb-6">
-                  Connect your Google Drive and automatically sync your documents. 
-                  Access and chat with your files from anywhere, anytime.
-                </p>
+
+            {/* Floating Animation */}
+            <div className="absolute top-0 left-1/4 w-16 h-16 bg-blue-500 rounded-full opacity-10 animate-float"></div>
+            <div className="absolute top-8 right-1/4 w-12 h-12 bg-purple-500 rounded-full opacity-10 animate-float-delay"></div>
+          </div>
+
+          {/* Integration Features Grid */}
+          <div className="glassmorphism-card bg-gray-50/80 backdrop-blur-sm border border-gray-200/50 rounded-3xl p-8">
+            <div className="grid md:grid-cols-3 gap-8">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-blue-600 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                  <Globe className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="font-semibold mb-2 text-lg">Cloud Storage</h3>
+                <p className="text-gray-600">Direct access to Google Drive, OneDrive, Dropbox, and more</p>
               </div>
-              
-              <div className="space-y-6">
-                {[
-                  { icon: RefreshCw, text: "Automatic document synchronization", delay: '400ms' },
-                  { icon: ExternalLink, text: "Direct access to Google Drive files", delay: '600ms' },
-                  { icon: Shield, text: "Secure, encrypted connections", delay: '800ms' },
-                  { icon: Users, text: "Team collaboration features", delay: '1000ms' }
-                ].map((item, index) => (
-                  <div key={index} className="animate-fade-in-up opacity-0" style={{ animationDelay: item.delay, animationFillMode: 'forwards' }}>
-                    <div className="flex items-center group">
-                      <div className="flex-shrink-0 h-12 w-12 bg-indigo-100 rounded-xl flex items-center justify-center group-hover:bg-indigo-200 transition-colors duration-200">
-                        <item.icon className="h-6 w-6 text-indigo-600" />
-                      </div>
-                      <p className="ml-4 text-gray-700 font-medium">{item.text}</p>
-                    </div>
-                  </div>
-                ))}
+
+              <div className="text-center">
+                <div className="w-16 h-16 bg-purple-600 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                  <Users className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="font-semibold mb-2 text-lg">Team Collaboration</h3>
+                <p className="text-gray-600">Seamless integration with Slack, Teams, and Atlassian tools</p>
+              </div>
+
+              <div className="text-center">
+                <div className="w-16 h-16 bg-green-600 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+                  <Star className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="font-semibold mb-2 text-lg">Productivity Suite</h3>
+                <p className="text-gray-600">Connect with Office 365, G Suite, and Zoho Workplace</p>
               </div>
             </div>
           </div>
         </div>
       </section>
-      
-      {/* Beta Section */}
-      <section id="beta" className="py-24 bg-gradient-to-br from-indigo-600 to-purple-700 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/20"></div>
-        <div className="container mx-auto px-6 relative z-10">
-          <div className="max-w-4xl mx-auto text-center">
-            <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}>
-              <div className="inline-flex items-center bg-white/20 backdrop-blur-sm rounded-full px-6 py-2 mb-8">
-                <span className="text-sm font-medium">🎉 Limited Beta Access</span>
+
+      {/* CTA Section */}
+      <section className="py-20 bg-gradient-to-r from-gray-900 via-blue-900 to-purple-900 text-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="mb-8">
+            <span className="text-blue-400 text-sm font-semibold tracking-wider uppercase">
+              Let's Get Started!
+            </span>
+          </div>
+          
+          <h2 className="text-4xl md:text-5xl font-bold mb-6">
+            Intelligent Document Processing
+          </h2>
+          
+          <p className="text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
+            Create your account and start processing documents with AI. 
+            Upload, chat, convert, and sync - it only takes 2 minutes to 
+            setup your workspace.
+          </p>
+
+          <div className="max-w-md mx-auto">
+            <form onSubmit={handleSubmit} className="flex bg-white/10 backdrop-blur-sm rounded-2xl p-2">
+              <div className="flex-1 flex items-center px-4">
+                <Mail className="w-5 h-5 text-gray-300 mr-3" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Your email address"
+                  className="flex-1 bg-transparent border-none outline-none text-white placeholder-gray-300"
+                  required
+                />
               </div>
-            </div>
-            
-            <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '200ms', animationFillMode: 'forwards' }}>
-              <h2 className="text-4xl md:text-5xl font-bold mb-6">
-                Join the Future of Document Management
-              </h2>
-            </div>
-            
-            <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '400ms', animationFillMode: 'forwards' }}>
-              <p className="text-xl opacity-90 mb-12 leading-relaxed">
-                Be among the first to experience DocuQuery. Help shape the future of how teams 
-                interact with documents. Limited spots available for our exclusive beta program.
-              </p>
-            </div>
-            
-            <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '600ms', animationFillMode: 'forwards' }}>
               <button
-                onClick={handleJoinBeta}
-                className="bg-white text-indigo-600 font-semibold py-4 px-8 rounded-2xl hover:bg-gray-100 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                type="submit"
+                className="bg-white text-gray-900 px-8 py-3 rounded-xl hover:bg-gray-100 transition-all duration-200 font-medium"
               >
-                Join Beta Program
+                Get Started
               </button>
-            </div>
+            </form>
           </div>
         </div>
       </section>
-      
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-16">
-        <div className="container mx-auto px-6">
-          <div className="grid md:grid-cols-4 gap-8 mb-12">
-            <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '0ms', animationFillMode: 'forwards' }}>
-              <div className="flex items-center mb-6">
-                <div className="bg-indigo-600 text-white p-2 rounded-xl">
-                  <FileText className="h-6 w-6" />
-                </div>
-                <span className="ml-3 text-xl font-bold">DocuQuery</span>
-              </div>
-              <p className="text-gray-400 text-sm leading-relaxed mb-6">
-                The intelligent document assistant that transforms how you interact with any document type. 
-                Powered by advanced AI for instant, accurate responses.
-              </p>
-              <div className="flex space-x-4">
-                {['twitter', 'linkedin', 'github'].map((social, index) => (
-                  <div key={social} className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-gray-700 transition-colors duration-200 cursor-pointer">
-                    <div className="w-5 h-5 bg-gray-400"></div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            
+
+      {/* Interactive FAQ Section */}
+      <section className="py-20 bg-gray-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <span className="text-blue-600 text-sm font-semibold tracking-wider uppercase">
+              FAQ
+            </span>
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mt-4 mb-6">
+              Frequently asked questions
+            </h2>
+            <p className="text-xl text-gray-600">
+              Got questions? We've got answers.
+            </p>
+          </div>
+
+          <div className="space-y-4">
             {[
               {
-                title: 'Product',
-                links: ['Features', 'Integrations', 'Pricing', 'Use Cases', 'Security', 'API'],
-                delay: '200ms'
+                question: "How does the real-time PDF editing work?",
+                answer: "Our revolutionary AI doesn't just chat - it actually edits your PDFs in real-time. Simply ask to change names, dates, addresses, or any content and watch it happen instantly. For example, say 'Change the name from John to Adam' and see it updated in 1-2 seconds across your entire document."
               },
               {
-                title: 'Company',
-                links: ['About', 'Blog', 'Careers', 'Contact', 'Press'],
-                delay: '400ms'
+                question: "What file formats are supported?",
+                answer: "We support PDF, Word (DOC/DOCX), PowerPoint (PPT/PPTX), Excel (XLS/XLSX), text files, and most image formats with OCR capabilities. Our advanced AI can process over 50 different file types."
               },
               {
-                title: 'Resources',
-                links: ['Documentation', 'Help Center', 'Community', 'Status', 'Changelog'],
-                delay: '600ms'
+                question: "Is my data secure?",
+                answer: "Yes, we use enterprise-grade AES-256 encryption and follow strict security protocols. Your documents are encrypted both in transit and at rest. We're SOC 2 Type II compliant with zero-knowledge architecture - only you can access your content."
+              },
+              {
+                question: "Can I integrate with my existing tools?",
+                answer: "Absolutely! DocuQuery integrates seamlessly with Google Drive, OneDrive, Dropbox, Atlassian tools, Slack, Microsoft Teams, Zoho Workplace, and many more. One-click integration gets you started in seconds."
+              },
+              {
+                question: "How accurate is the AI and document conversion?",
+                answer: "Our AI-powered processing achieves 99%+ accuracy for most document types, with advanced OCR for scanned documents. The real-time editing feature maintains formatting integrity while making precise content changes."
+              },
+              {
+                question: "Can I convert documents to audiobooks?",
+                answer: "Yes! Our AI can convert any document to high-quality audiobooks with 50+ natural-sounding voices in multiple languages. Perfect for learning on the go, accessibility needs, or when you prefer listening to reading."
               }
-            ].map((section, index) => (
-              <div key={section.title} className="animate-fade-in-up opacity-0" style={{ animationDelay: section.delay, animationFillMode: 'forwards' }}>
-                <h4 className="text-lg font-semibold mb-6">{section.title}</h4>
-                <ul className="space-y-3">
-                  {section.links.map((link) => (
-                    <li key={link}>
-                      <a href="#coming-soon" onClick={handleFooterClick} className="text-gray-400 hover:text-white transition-colors duration-200 text-sm">
-                        {link}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
+            ].map((faq, index) => (
+              <div key={index} className="glassmorphism-card bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-2xl overflow-hidden">
+                <button
+                  onClick={() => setOpenFaq(openFaq === index ? null : index)}
+                  className="w-full p-6 text-left flex items-center justify-between hover:bg-gray-50/50 transition-colors"
+                >
+                  <h3 className="text-lg font-semibold text-gray-900">{faq.question}</h3>
+                  <div className="flex-shrink-0 ml-4">
+                    {openFaq === index ? (
+                      <ChevronUp className="w-5 h-5 text-gray-500" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-gray-500" />
+                    )}
+                  </div>
+                </button>
+                {openFaq === index && (
+                  <div className="px-6 pb-6">
+                    <div className="border-t border-gray-200 pt-4">
+                      <p className="text-gray-600 leading-relaxed">{faq.answer}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
-          
-          <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center">
-            <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '800ms', animationFillMode: 'forwards' }}>
-              <p className="text-gray-500 text-sm mb-4 md:mb-0">
-                © {new Date().getFullYear()} DocuQuery. All rights reserved. • Powered by Google Gemini
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 text-white py-12">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-4 gap-8">
+            <div>
+              <div className="flex items-center space-x-2 mb-4">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-xl font-bold">DocuQuery</span>
+              </div>
+              <p className="text-gray-400 text-sm">
+                Intelligent document processing powered by AI. Chat, convert, and collaborate with your documents.
               </p>
             </div>
-            <div className="animate-fade-in-up opacity-0" style={{ animationDelay: '1000ms', animationFillMode: 'forwards' }}>
-              <div className="flex space-x-6 text-sm">
-                <a href="#coming-soon" onClick={handleFooterClick} className="text-gray-400 hover:text-white transition-colors duration-200">Privacy</a>
-                <a href="#coming-soon" onClick={handleFooterClick} className="text-gray-400 hover:text-white transition-colors duration-200">Terms</a>
-                <a href="#coming-soon" onClick={handleFooterClick} className="text-gray-400 hover:text-white transition-colors duration-200">Cookies</a>
-              </div>
+
+            <div>
+              <h3 className="font-semibold mb-4">Product</h3>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
+                <li><a href="#integrations" className="hover:text-white transition-colors">Integrations</a></li>
+                <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
+                <li><a href="#docs" className="hover:text-white transition-colors">Documentation</a></li>
+              </ul>
             </div>
+
+            <div>
+              <h3 className="font-semibold mb-4">Company</h3>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li><Link to="/about" className="hover:text-white transition-colors">About</Link></li>
+                <li><Link to="/blog" className="hover:text-white transition-colors">Blog</Link></li>
+                <li><Link to="/careers" className="hover:text-white transition-colors">Careers</Link></li>
+                <li><Link to="/contact" className="hover:text-white transition-colors">Contact</Link></li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="font-semibold mb-4">Legal</h3>
+              <ul className="space-y-2 text-sm text-gray-400">
+                <li><Link to="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
+                <li><Link to="/terms-of-service" className="hover:text-white transition-colors">Terms of Service</Link></li>
+                <li><Link to="/security" className="hover:text-white transition-colors">Security</Link></li>
+                <li><Link to="/gdpr" className="hover:text-white transition-colors">GDPR</Link></li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-800 mt-12 pt-8 text-center">
+            <p className="text-gray-400 text-sm">
+              © 2025 DocuQuery. All rights reserved. Made with ❤️ for document lovers.
+            </p>
           </div>
         </div>
       </footer>
 
-      {/* Beta Popup */}
-      {showBetaPopup && <BetaPopup />}
-      
-      {/* Enhanced CSS Animations */}
-      <style jsx>{`
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+      <style>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-20px); }
         }
         
-        @keyframes slideInLeft {
-          from {
-            opacity: 0;
-            transform: translateX(-30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
+        @keyframes float-delayed {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-15px); }
         }
-        
-        @keyframes slideInRight {
-          from {
-            opacity: 0;
-            transform: translateX(30px);
+
+        @keyframes blob {
+          0% {
+            transform: translate(0px, 0px) scale(1);
           }
-          to {
-            opacity: 1;
-            transform: translateX(0);
+          33% {
+            transform: translate(30px, -50px) scale(1.1);
+          }
+          66% {
+            transform: translate(-20px, 20px) scale(0.9);
+          }
+          100% {
+            transform: translate(0px, 0px) scale(1);
           }
         }
         
-        @keyframes scaleIn {
-          from {
-            opacity: 0;
-            transform: scale(0.9);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
         }
         
-        .animate-fade-in-up {
-          animation: fadeInUp 0.8s ease-out forwards;
+        .animate-float-delayed {
+          animation: float-delayed 6s ease-in-out infinite 2s;
         }
-        
-        .animate-slide-in-left {
-          animation: slideInLeft 0.8s ease-out forwards;
+
+        .animate-float-delay {
+          animation: float 8s ease-in-out infinite 3s;
         }
-        
-        .animate-slide-in-right {
-          animation: slideInRight 0.8s ease-out forwards;
+
+        .animate-blob {
+          animation: blob 7s infinite;
         }
-        
-        .animate-scale-in {
-          animation: scaleIn 0.6s ease-out forwards;
+
+        .animation-delay-2000 {
+          animation-delay: 2s;
         }
-        
-        .hover-lift {
-          transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+        .animation-delay-4000 {
+          animation-delay: 4s;
         }
-        
-        .hover-lift:hover {
-          transform: translateY(-8px);
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+
+        .glassmorphism-card {
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
         }
-        
-        .gradient-text {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
+
+        .glassmorphism-card:hover {
+          background: rgba(255, 255, 255, 0.15);
+          transform: translateY(-2px);
+          transition: all 0.3s ease;
+        }
+
+        /* Grainy texture effect */
+        .glassmorphism-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-image: 
+            radial-gradient(circle at 1px 1px, rgba(255,255,255,.15) 1px, transparent 0);
+          background-size: 20px 20px;
+          opacity: 0.5;
+          pointer-events: none;
+          border-radius: inherit;
+        }
+
+        /* Enhanced gradient backgrounds */
+        .gradient-bg {
+          background: linear-gradient(135deg, 
+            rgba(99, 102, 241, 0.1) 0%, 
+            rgba(219, 234, 254, 0.1) 25%, 
+            rgba(252, 231, 243, 0.1) 50%, 
+            rgba(233, 213, 255, 0.1) 75%, 
+            rgba(186, 230, 253, 0.1) 100%);
         }
       `}</style>
     </div>
   );
 };
 
-export default App;
+export default LandingPage;

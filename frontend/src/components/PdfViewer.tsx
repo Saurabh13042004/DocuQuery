@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Layers } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
 import { DocumentType } from '../types';
 import { Document, Page, pdfjs } from 'react-pdf';
 
@@ -8,19 +8,52 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 
 interface PdfViewerProps {
   document: DocumentType;
-  customPdfUrl?: string; // Add this prop to allow viewing edited PDFs
+  customPdfUrl?: string;
 }
 
 const PdfViewer: React.FC<PdfViewerProps> = ({ document, customPdfUrl }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [zoom, setZoom] = useState(100);
-  const [showThumbnails, setShowThumbnails] = useState(false);
   const [numPages, setNumPages] = useState(document.pageCount || 1);
   const [pdfUrl, setPdfUrl] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [fitToWidth, setFitToWidth] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Track container width for responsive sizing
+  useEffect(() => {
+    const updateContainerWidth = () => {
+      if (containerRef.current) {
+        const width = containerRef.current.clientWidth - 32;
+        setContainerWidth(width);
+      }
+    };
+
+    updateContainerWidth();
+    
+    const resizeObserver = new ResizeObserver(updateContainerWidth);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+    
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  // Calculate responsive page width
+  const calculatePageWidth = useCallback(() => {
+    if (!containerWidth) return 600;
+    
+    if (fitToWidth) {
+      return Math.min(containerWidth * 0.95, containerWidth - 20);
+    } else {
+      return Math.min((containerWidth * zoom) / 100, containerWidth * 2);
+    }
+  }, [containerWidth, zoom, fitToWidth]);
 
   useEffect(() => {
-    // If customPdfUrl is provided, use it instead of the document's filePath
     if (customPdfUrl) {
       const baseUrl = 'http://127.0.0.1:8000';
       const url = customPdfUrl.startsWith('http') 
@@ -28,11 +61,9 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ document, customPdfUrl }) => {
         : `${baseUrl}${customPdfUrl}`;
       
       setPdfUrl(url);
-      // Reset to page 1 when loading a new PDF
       setCurrentPage(1);
     }
     else if (document.filePath) {
-      // For development environment, filePath is a local path
       const baseUrl = 'http://127.0.0.1:8000';
       const url = document.filePath.startsWith('http')
         ? document.filePath
@@ -55,15 +86,22 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ document, customPdfUrl }) => {
   };
 
   const handleZoomIn = () => {
+    setFitToWidth(false);
     if (zoom < 200) {
-      setZoom(zoom + 10);
+      setZoom(zoom + 25);
     }
   };
 
   const handleZoomOut = () => {
+    setFitToWidth(false);
     if (zoom > 50) {
-      setZoom(zoom - 10);
+      setZoom(zoom - 25);
     }
+  };
+
+  const handleFitToWidth = () => {
+    setFitToWidth(true);
+    setZoom(100);
   };
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
@@ -72,107 +110,106 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ document, customPdfUrl }) => {
   };
 
   return (
-    <div className="flex h-full">
-      {showThumbnails && (
-        <div className="w-16 bg-gray-50 border-r border-gray-200 overflow-y-auto">
-          {Array.from({ length: numPages }, (_, i) => i + 1).map((page) => (
-            <div
-              key={page}
-              onClick={() => setCurrentPage(page)}
-              className={`cursor-pointer p-1 m-1 border ${currentPage === page
-                  ? 'border-indigo-500 bg-indigo-50'
-                  : 'border-gray-200 hover:bg-gray-100'
-                }`}
-            >
-              <div className="aspect-[3/4] bg-white flex items-center justify-center text-xs text-gray-500">
-                {page}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="flex-1 flex flex-col">
-        <div className="flex items-center justify-between p-2 bg-gray-50 border-b border-gray-200">
-          <div className="flex items-center space-x-1">
+    <div className="h-full flex flex-col bg-background">
+      {/* PDF Toolbar */}
+      <div className="bg-background shadow-sm border-b">
+        <div className="flex items-center justify-between px-3 py-2 bg-muted/30">
+          {/* Navigation Controls */}
+          <div className="flex items-center space-x-2">
             <button
               onClick={handlePrevPage}
               disabled={currentPage === 1}
-              className={`p-1 rounded ${currentPage === 1
-                  ? 'text-gray-300 cursor-not-allowed'
-                  : 'text-gray-700 hover:bg-gray-200'
-                }`}
+              className={`p-1.5 rounded-md transition-colors ${
+                currentPage === 1
+                  ? 'text-muted-foreground cursor-not-allowed'
+                  : 'text-foreground hover:bg-muted'
+              }`}
             >
-              <ChevronLeft className="h-5 w-5" />
+              <ChevronLeft className="h-4 w-4" />
             </button>
-            <span className="text-sm text-gray-700">
+            <span className="text-sm font-medium text-foreground min-w-[60px] text-center">
               {currentPage} / {numPages}
             </span>
             <button
               onClick={handleNextPage}
               disabled={currentPage === numPages}
-              className={`p-1 rounded ${currentPage === numPages
-                  ? 'text-gray-300 cursor-not-allowed'
-                  : 'text-gray-700 hover:bg-gray-200'
-                }`}
+              className={`p-1.5 rounded-md transition-colors ${
+                currentPage === numPages
+                  ? 'text-muted-foreground cursor-not-allowed'
+                  : 'text-foreground hover:bg-muted'
+              }`}
             >
-              <ChevronRight className="h-5 w-5" />
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
 
+          {/* Zoom Controls */}
           <div className="flex items-center space-x-1">
             <button
-              onClick={handleZoomIn}
-              className="p-1 rounded text-gray-700 hover:bg-gray-200"
+              onClick={handleFitToWidth}
+              className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                fitToWidth
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-foreground hover:bg-muted'
+              }`}
             >
-              <ZoomIn className="h-4 w-4" />
+              Fit
             </button>
-            <span className="text-xs text-gray-600">{zoom}%</span>
             <button
               onClick={handleZoomOut}
-              className="p-1 rounded text-gray-700 hover:bg-gray-200"
+              disabled={zoom <= 50 && !fitToWidth}
+              className="p-1.5 rounded-md text-foreground hover:bg-muted transition-colors disabled:text-muted-foreground disabled:cursor-not-allowed"
             >
               <ZoomOut className="h-4 w-4" />
             </button>
+            <span className="text-xs font-medium text-muted-foreground min-w-[45px] text-center">
+              {fitToWidth ? 'Auto' : `${zoom}%`}
+            </span>
             <button
-              onClick={() => setShowThumbnails(!showThumbnails)}
-              className={`p-1 rounded ${showThumbnails
-                  ? 'bg-gray-200 text-gray-800'
-                  : 'text-gray-700 hover:bg-gray-200'
-                }`}
+              onClick={handleZoomIn}
+              disabled={zoom >= 200 && !fitToWidth}
+              className="p-1.5 rounded-md text-foreground hover:bg-muted transition-colors disabled:text-muted-foreground disabled:cursor-not-allowed"
             >
-              <Layers className="h-4 w-4" />
+              <ZoomIn className="h-4 w-4" />
             </button>
           </div>
         </div>
+      </div>
 
-        <div className="flex-1 overflow-auto flex items-center justify-center bg-gray-100 p-4">
+      {/* PDF Content */}
+      <div 
+        ref={containerRef}
+        className="flex-1 overflow-auto bg-muted/10"
+      >
+        <div className="min-h-full flex items-start justify-center py-4">
           {isLoading && (
-            <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
             </div>
           )}
 
           {pdfUrl && (
-            <div
-              style={{
-                width: `${zoom}%`,
-                maxWidth: '100%',
-                position: 'relative'
-              }}
-            >
+            <div className="w-full max-w-full flex justify-center px-2">
               <Document
                 file={pdfUrl}
                 onLoadSuccess={onDocumentLoadSuccess}
-                loading={<div className="flex justify-center"><div className="animate-spin h-8 w-8 border-4 border-indigo-500 rounded-full border-t-transparent"></div></div>}
-                error={<div className="text-red-500">Failed to load PDF</div>}
+                loading={
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin h-6 w-6 border-2 border-primary rounded-full border-t-transparent"></div>
+                  </div>
+                }
+                error={
+                  <div className="text-destructive text-center py-8">
+                    <p className="text-sm">Failed to load PDF</p>
+                  </div>
+                }
               >
                 <Page
                   pageNumber={currentPage}
                   renderTextLayer={false}
                   renderAnnotationLayer={false}
-                  width={zoom * 6.5}
-                  className="shadow-lg"
+                  width={calculatePageWidth()}
+                  className="shadow-md border border-border rounded-lg bg-background max-w-full"
                 />
               </Document>
             </div>

@@ -1,18 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import Header from './Header';
+import UploadModal from './UploadModal';
 
 const Layout: React.FC = () => {
+  const [showUploadModal, setShowUploadModal] = useState(false);
+
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto">
-          <Outlet />
-        </main>
+    <div className="flex h-screen bg-background">
+      <Sidebar onUploadClick={() => setShowUploadModal(true)} />
+      <div className="flex-1 overflow-hidden">
+        <Outlet />
       </div>
+      
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <UploadModal onClose={() => setShowUploadModal(false)} />
+      )}
     </div>
   );
 };

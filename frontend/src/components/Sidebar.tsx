@@ -1,192 +1,164 @@
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { 
-  File, FilePlus, Inbox, MessageSquare, Folder, Star, 
-  Trash2, Settings, ChevronRight, ChevronDown, PlusCircle 
+import React from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import {
+  FileText,
+  Upload,
+  Clock,
+  Star,
+  Folder,
+  MessageSquare,
+  Trash2,
+  Settings,
+  User,
+  LogOut,
+  Home,
+  Cloud,
+  Zap
 } from 'lucide-react';
-import { usePdf } from '../context/PdfContext';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
+import { useAuth } from '../context/AuthContext';
 
-const Sidebar: React.FC = () => {
+interface SidebarProps {
+  onUploadClick: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ onUploadClick }) => {
   const location = useLocation();
-  const { documents } = usePdf();
-  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({
-    'recent': true,
-    'starred': false,
-    'folders': false
-  });
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
-  const toggleFolder = (folder: string) => {
-    setExpandedFolders(prev => ({
-      ...prev,
-      [folder]: !prev[folder]
-    }));
+  const handleLogout = () => {
+    logout();
+    navigate('/');
   };
 
+  const isActive = (path: string) => location.pathname === path;
+
+  const mainNavItems = [
+    { icon: Home, label: 'Dashboard', path: '/app' },
+    { icon: Clock, label: 'Recent', path: '/app/recent' },
+    { icon: Star, label: 'Starred', path: '/app/starred' },
+    { icon: Folder, label: 'Folders', path: '/app/folders' },
+    { icon: Cloud, label: 'Integrations', path: '/app/integrations' },
+  ];
+
+  const secondaryNavItems = [
+    { icon: MessageSquare, label: 'Chat History', path: '/app/chat-history' },
+    { icon: Zap, label: 'Tools', path: '/app/tools' },
+    { icon: Trash2, label: 'Trash', path: '/app/trash' },
+    { icon: Settings, label: 'Settings', path: '/app/settings' },
+  ];
+
   return (
-    <aside className="hidden md:flex md:flex-col w-64 border-r border-gray-200 bg-white">
-      <div className="p-4">
-        <button className="flex items-center justify-center w-full py-2.5 px-4 bg-indigo-600 text-white rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50 transition duration-150">
-          <FilePlus className="h-5 w-5 mr-2" />
-          <span className="font-medium">Upload PDF</span>
-        </button>
+    <div className="w-64 bg-background border-r border-border h-screen flex flex-col">
+      {/* Logo */}
+      <div className="p-6 border-b border-border">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+            <FileText className="h-5 w-5 text-primary-foreground" />
+          </div>
+          <span className="text-xl font-bold text-foreground">DocuQuery</span>
+        </div>
       </div>
-      
-      <nav className="flex-1 overflow-y-auto">
-        <ul className="px-3 space-y-1">
-          <li>
-            <Link 
-              to="/app" 
-              className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                location.pathname === '/app' 
-                  ? 'bg-indigo-50 text-indigo-600' 
-                  : 'text-gray-700 hover:bg-gray-100'
+
+      {/* Upload Button */}
+      <div className="p-4">
+        <Button 
+          onClick={onUploadClick} 
+          className="w-full gap-2" 
+          size="default"
+        >
+          <Upload className="h-4 w-4" />
+          Upload PDF
+        </Button>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 px-3">
+        {/* Main Navigation */}
+        <div className="space-y-1 mb-6">
+          {mainNavItems.map((item) => (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                isActive(item.path)
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
               }`}
             >
-              <Inbox className="h-5 w-5 mr-3 text-gray-400" />
-              <span>Inbox</span>
+              <div className="flex items-center gap-3">
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </div>
+
             </Link>
-          </li>
-          <li>
-            <button 
-              onClick={() => toggleFolder('recent')}
-              className="flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100"
-            >
-              <div className="flex items-center">
-                <File className="h-5 w-5 mr-3 text-gray-400" />
-                <span>Recent Documents</span>
-              </div>
-              {expandedFolders.recent ? (
-                <ChevronDown className="h-4 w-4 text-gray-400" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-gray-400" />
-              )}
-            </button>
-            
-            {expandedFolders.recent && (
-              <ul className="pl-10 mt-1 space-y-1">
-                {documents.slice(0, 5).map((doc) => (
-                  <li key={doc.id}>
-                    <Link
-                      to={`/app/chat/${doc.id}`}
-                      className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                        location.pathname === `/app/chat/${doc.id}`
-                          ? 'bg-indigo-50 text-indigo-600'
-                          : 'text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      <span className="truncate">{doc.name}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-          <li>
-            <button
-              onClick={() => toggleFolder('starred')}
-              className="flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100"
-            >
-              <div className="flex items-center">
-                <Star className="h-5 w-5 mr-3 text-gray-400" />
-                <span>Starred</span>
-              </div>
-              {expandedFolders.starred ? (
-                <ChevronDown className="h-4 w-4 text-gray-400" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-gray-400" />
-              )}
-            </button>
-            
-            {expandedFolders.starred && (
-              <ul className="pl-10 mt-1 space-y-1">
-                {documents.filter(doc => doc.starred).map((doc) => (
-                  <li key={doc.id}>
-                    <Link
-                      to={`/app/chat/${doc.id}`}
-                      className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                        location.pathname === `/app/chat/${doc.id}`
-                          ? 'bg-indigo-50 text-indigo-600'
-                          : 'text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      <span className="truncate">{doc.name}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-          <li>
-            <button
-              onClick={() => toggleFolder('folders')}
-              className="flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100"
-            >
-              <div className="flex items-center">
-                <Folder className="h-5 w-5 mr-3 text-gray-400" />
-                <span>Folders</span>
-              </div>
-              {expandedFolders.folders ? (
-                <ChevronDown className="h-4 w-4 text-gray-400" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-gray-400" />
-              )}
-            </button>
-            
-            {expandedFolders.folders && (
-              <ul className="pl-10 mt-1 space-y-1">
-                <li>
-                  <Link
-                    to="/app"
-                    className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100"
-                  >
-                    <span>Work</span>
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/app"
-                    className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100"
-                  >
-                    <span>Personal</span>
-                  </Link>
-                </li>
-                <li>
-                  <button className="flex items-center px-3 py-2 text-sm font-medium text-indigo-600 rounded-md hover:bg-gray-100">
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                    <span>Add folder</span>
-                  </button>
-                </li>
-              </ul>
-            )}
-          </li>
-          <li>
+          ))}
+        </div>
+
+        <Separator className="my-4" />
+
+        {/* Secondary Navigation */}
+        <div className="space-y-1">
+          {secondaryNavItems.map((item) => (
             <Link
-              to="/app"
-              className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100"
+              key={item.path}
+              to={item.path}
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                isActive(item.path)
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+              }`}
             >
-              <MessageSquare className="h-5 w-5 mr-3 text-gray-400" />
-              <span>Chat History</span>
+              <item.icon className="h-4 w-4" />
+              {item.label}
             </Link>
-          </li>
-          <li>
-            <Link
-              to="/app"
-              className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100"
-            >
-              <Trash2 className="h-5 w-5 mr-3 text-gray-400" />
-              <span>Trash</span>
-            </Link>
-          </li>
-        </ul>
+          ))}
+        </div>
       </nav>
-      
-      <div className="p-4 border-t border-gray-200">
-        <button className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100">
-          <Settings className="h-5 w-5 mr-3 text-gray-400" />
-          <span>Settings</span>
-        </button>
+
+      {/* User Profile */}
+      <div className="p-4 border-t border-border">
+        <div className="flex items-center gap-3 mb-3">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="text-xs">
+              {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground truncate">
+              {user?.name || 'User'}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {user?.email || 'user@example.com'}
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex-1 gap-2 text-xs"
+            onClick={() => navigate('/profile')}
+          >
+            <User className="h-3 w-3" />
+            Profile
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex-1 gap-2 text-xs"
+            onClick={handleLogout}
+          >
+            <LogOut className="h-3 w-3" />
+            Logout
+          </Button>
+        </div>
       </div>
-    </aside>
+    </div>
   );
 };
 

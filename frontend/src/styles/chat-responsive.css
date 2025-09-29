@@ -1,0 +1,75 @@
+/* Enhanced responsive styles for ChatView */
+.chat-container {
+  container-type: inline-size;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Responsive breakpoints */
+@container (max-width: 768px) {
+  .pdf-panel {
+    width: 100% !important;
+    position: absolute !important;
+    top: 0;
+    left: 0;
+    z-index: 40;
+    background: hsl(var(--background));
+  }
+  
+  .chat-panel {
+    width: 100% !important;
+  }
+  
+  .resizable-handle {
+    display: none;
+  }
+}
+
+@container (min-width: 769px) and (max-width: 1024px) {
+  .pdf-panel {
+    min-width: 300px;
+    max-width: 500px;
+  }
+}
+
+/* Smooth animations */
+.layout-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Focus styles for accessibility */
+.focus-ring:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Message spacing improvements */
+.message-container {
+  scroll-padding-top: 1rem;
+  scroll-padding-bottom: 1rem;
+}
+
+/* Better button hover states */
+.btn-hover {
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-hover:hover {
+  scale: 1.02;
+}
+
+/* Loading animation improvements */
+@keyframes bounce-smooth {
+  0%, 80%, 100% { 
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% { 
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.bounce-smooth {
+  animation: bounce-smooth 1.4s ease-in-out infinite;
+}
