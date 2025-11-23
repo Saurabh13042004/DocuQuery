@@ -6,29 +6,95 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage
 import re
 from datetime import datetime
+from pathlib import Path
 
 load_dotenv()
 
 
-# s3_client = boto3.client(
-#     's3',
-#     aws_access_key_id=os.environ["AWS_ACCESS_KEY"],
-#     aws_secret_access_key=os.environ['AWS_SECRET_KEY'],
-#     region_name=os.environ['AWS_REGION']
-# )
+s3_client = boto3.client(
+    's3',
+    aws_access_key_id=os.environ["AWS_ACCESS_KEY"],
+    aws_secret_access_key=os.environ['AWS_SECRET_KEY'],
+    region_name=os.environ['AWS_REGION']
+)
+
+# Register downloaded fonts with PyMuPDF
+def register_custom_fonts():
+    """Register custom fonts from fonts directory."""
+    try:
+        fonts_dir = Path(__file__).parent.parent.parent / "fonts"
+        
+        font_mappings = {
+            'DejaVuSerifCondensed': 'DejaVuSerifCondensed.ttf',
+            'DejaVuSerifCondensed-Bold': 'DejaVuSerifCondensed-Bold.ttf',
+            'DejaVuSerifCondensed-BoldItalic': 'DejaVuSerifCondensed-BoldItalic.ttf',
+            'DejaVuSerifCondensed-Italic': 'DejaVuSerifCondensed-Italic.ttf',
+        }
+        
+        for font_name, file_name in font_mappings.items():
+            font_path = fonts_dir / file_name
+            if font_path.exists():
+                try:
+                    fitz.Font(font_name, str(font_path))
+                except Exception:
+                    pass  # Font already registered or skipped
+    except Exception:
+        pass  # Skip if fonts directory doesn't exist
+
+# Register fonts on startup
+register_custom_fonts()
+
+# Font fallback mapping for better font substitution
+FONT_FALLBACK_MAP = {
+    'DejaVuSerifCondensed': 'DejaVuSerifCondensed',  # Try to use the same font
+    'DejaVuSerifCondensed-Bol': 'DejaVuSerifCondensed-Bold',
+    'DejaVuSerifCondensed-BolIta': 'DejaVuSerifCondensed-BoldItalic',
+    'DejaVuSerifCondensed-Ita': 'DejaVuSerifCondensed-Italic',
+    'ind_hi_1_001': 'Helvetica',
+    'XBZar-Bold': 'Helvetica-Bold',
+    'Garuda': 'Helvetica',
+    'Tlwg': 'Helvetica',
+}
+
+def get_best_font_substitute(font_name):
+    """Get the best font substitute for unavailable fonts."""
+    if not font_name:
+        return 'DejaVuSerifCondensed'
+    
+    # Check direct mapping first
+    if font_name in FONT_FALLBACK_MAP:
+        return FONT_FALLBACK_MAP[font_name]
+    
+    # Check if it's a bold variant
+    if 'Bold' in font_name or 'bold' in font_name or '-B' in font_name:
+        return 'DejaVuSerifCondensed-Bold'
+    
+    # Check if it's an italic variant
+    if 'Italic' in font_name or 'Oblique' in font_name or '-I' in font_name or '-O' in font_name:
+        return 'DejaVuSerifCondensed-Italic'
+    
+    # Check if it's bold-italic
+    if ('Bold' in font_name or 'bold' in font_name) and ('Italic' in font_name or 'Oblique' in font_name):
+        return 'DejaVuSerifCondensed-BoldItalic'
+    
+    # Default fallback to DejaVu
+    return 'DejaVuSerifCondensed'
 
 llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash",
+    model="gemini-2.0-flash",
     google_api_key=os.environ["GEMINI_API_KEY"],
 )
 conversation_history = []
 environment = os.environ['ENVIRONMENT']
+
+print(f"PDF Service initialized in {environment} environment.")
 
 async def save_pdf(file) -> str:
     """
     Save a PDF file either locally or to an S3 bucket based on the environment.
     """
     bucket_name = os.environ['AWS_BUCKET_NAME']
+    region = os.environ['AWS_REGION']
 
     if environment == "production":
 
@@ -36,7 +102,7 @@ async def save_pdf(file) -> str:
         await file.seek(0)
         
         s3_client.upload_fileobj(file.file, bucket_name, file_key, ExtraArgs={'ContentType': 'application/pdf'})
-        file_url = f"https://{bucket_name}.s3.amazonaws.com/{file_key}"
+        file_url = f"https://{bucket_name}.s3.{region}.amazonaws.com/{file_key}"
         print(f"File uploaded to S3 at: {file_url}")
         return file_url
 
@@ -103,7 +169,7 @@ async def answer_question(question: str, pdf_text: str):
     
     return "I'm sorry, I couldn't find an answer to that question."
 
-async def process_user_input(question: str, pdf_text: str, file_path: str):
+async def process_user_input(question: str, pdf_text: str, file_path: str, document=None, db=None):
     """
     Process user input - either answer a question or edit the PDF based on instruction.
     """
@@ -136,6 +202,11 @@ async def process_user_input(question: str, pdf_text: str, file_path: str):
         result = await edit_pdf(file_path, question)
         
         if result["success"]:
+            # Update the document's edited_file_path in the database
+            if document and db:
+                document.edited_file_path = result["edited_file_path"]
+                db.commit()
+            
             response_text = f"I've edited the PDF as requested. {result['changes']} You can download the updated version."
             return {
                 "answer": response_text,
@@ -157,7 +228,7 @@ async def process_user_input(question: str, pdf_text: str, file_path: str):
 
 async def edit_pdf(file_path: str, instruction: str):
     """
-    Edit a PDF based on user instruction while preserving text formatting.
+    Edit a PDF based on user instruction while preserving exact font and formatting.
     Returns information about the edited PDF.
     """
     # Handle S3 paths in production
@@ -219,81 +290,127 @@ async def edit_pdf(file_path: str, instruction: str):
     changes_made = False
     
     for page_num, page in enumerate(doc):
-        # Get spans which contain formatting information
-        spans = page.get_text("dict")["blocks"]
+        # Use search to find all occurrences with exact positioning
+        text_dict = page.get_text("dict")
         
-        for block in spans:
-            if "lines" in block:
-                for line in block["lines"]:
-                    for span in line["spans"]:
-                        # Check if this span contains our target text
-                        if original_text in span["text"]:
-                            # We found the text to replace
-                            
-                            # Store the formatting information
-                            font_name = span["font"]
-                            font_size = span["size"]
-                            font_color = span["color"]
-                            flags = span["flags"]  # Contains bold/italic info
-
-                            # Get the rectangle coordinates for this text
-                            rect = fitz.Rect(span["bbox"])
-
-                            # Redact the original text
-                            page.add_redact_annot(rect)
-                            page.apply_redactions()
-
-                            # Convert color to the format expected by PyMuPDF
-                            if isinstance(font_color, int):
-                                r = (font_color >> 16) & 0xff
-                                g = (font_color >> 8) & 0xff
-                                b = font_color & 0xff
-                                color = (r/255, g/255, b/255)
-                            else:
-                                color = font_color
-
-                            # Determine font based on flags
-                            if flags & 16:  # Bold flag (2^4)
-                                font_name = "Helvetica-Bold"
-                            elif flags & 2:  # Italic flag (2^1)
-                                font_name = "Helvetica-Oblique"
-                            else:
-                                font_name = "Helvetica"
-
-                            # Calculate baseline position for proper vertical alignment
-                            # Use the bottom-left corner of the bounding box
-                            # Add 1 point to position at the baseline
-                            baseline_point = fitz.Point(rect.x0, rect.y1 - 1)
-                            
-                            print(f"Inserting text at baseline position ({baseline_point.x}, {baseline_point.y})")
-                            
+        for block in text_dict.get("blocks", []):
+            if block.get("type") != 0:  # 0 = text block
+                continue
+                
+            for line in block.get("lines", []):
+                for span in line.get("spans", []):
+                    span_text = span.get("text", "")
+                    
+                    # Check if original text is in this span
+                    if original_text not in span_text:
+                        continue
+                    
+                    # Extract complete font information
+                    original_font = span.get("font", "Helv")
+                    font_size = span.get("size", 12)
+                    font_color = span.get("color", 0)
+                    bbox = span.get("bbox", (0, 0, 0, 0))
+                    
+                    # Get best substitute if original font not available
+                    best_substitute = get_best_font_substitute(original_font)
+                    
+                    # Convert color to RGB
+                    text_color = font_color
+                    if isinstance(text_color, int):
+                        if text_color == 0:
+                            rgb_color = (0, 0, 0)  # Black
+                        else:
+                            r = (text_color >> 16) & 0xff
+                            g = (text_color >> 8) & 0xff
+                            b = text_color & 0xff
+                            rgb_color = (r/255, g/255, b/255)
+                    else:
+                        rgb_color = text_color if text_color else (0, 0, 0)
+                    
+                    # Clear the old text area with white rectangle
+                    page.draw_rect(fitz.Rect(bbox), color=None, fill=(1, 1, 1))
+                    
+                    # Calculate baseline position for proper vertical alignment
+                    baseline_y = bbox[3] - (font_size * 0.2)
+                    baseline_point = fitz.Point(bbox[0], baseline_y)
+                    
+                    # Try to insert text with progressively more fallback options
+                    text_inserted = False
+                    
+                    # Attempt 1: Try with original font from font file (if DejaVu)
+                    if original_font == 'DejaVuSerifCondensed':
+                        font_file = Path(__file__).parent.parent.parent / "fonts" / "DejaVuSerifCondensed.ttf"
+                        if font_file.exists():
                             try:
-                                # Insert the text at the baseline position
                                 page.insert_text(
                                     baseline_point,
                                     new_text,
-                                    fontname=font_name,
+                                    fontname="DejaVuSerifCondensed",
                                     fontsize=font_size,
-                                    color=color,
-                                    render_mode=0  # Normal rendering
+                                    color=rgb_color,
+                                    fontfile=str(font_file)  # Use fontfile parameter with path
                                 )
-                                changes_made = True
-                            except Exception as e:
-                                print(f"Error inserting text: {e}")
-                                # Fallback to textbox insertion
-                                try:
-                                    page.insert_textbox(
-                                        rect,
-                                        new_text,
-                                        fontname=font_name,
-                                        fontsize=font_size,
-                                        color=color,
-                                        render_mode=0,
-                                        align=0
-                                    )
-                                    changes_made = True
-                                except Exception as e2:
-                                    print(f"Textbox insertion also failed: {e2}")
+                                text_inserted = True
+                            except Exception:
+                                pass  # Font file approach failed
+                    
+                    # Attempt 2: Try with original font name (standard)
+                    if not text_inserted:
+                        try:
+                            page.insert_text(
+                                baseline_point,
+                                new_text,
+                                fontname=original_font,
+                                fontsize=font_size,
+                                color=rgb_color
+                            )
+                            text_inserted = True
+                        except Exception:
+                            pass  # Original font not available
+                    
+                    # Attempt 3: Try with best substitute font
+                    if not text_inserted and best_substitute != original_font:
+                        try:
+                            page.insert_text(
+                                baseline_point,
+                                new_text,
+                                fontname=best_substitute,
+                                fontsize=font_size,
+                                color=rgb_color
+                            )
+                            text_inserted = True
+                        except Exception:
+                            pass  # Substitute also failed
+                    
+                    # Attempt 4: Try Helvetica directly
+                    if not text_inserted and best_substitute != "Helvetica":
+                        try:
+                            page.insert_text(
+                                baseline_point,
+                                new_text,
+                                fontname="Helvetica",
+                                fontsize=font_size,
+                                color=rgb_color
+                            )
+                            text_inserted = True
+                        except Exception:
+                            pass  # Helvetica also failed
+                    
+                    # Attempt 5: Use default font
+                    if not text_inserted:
+                        try:
+                            page.insert_text(
+                                baseline_point,
+                                new_text,
+                                fontsize=font_size,
+                                color=rgb_color
+                            )
+                            text_inserted = True
+                        except Exception as e:
+                            print(f"Warning: Could not insert text with any font method: {e}")
+                    
+                    if text_inserted:
+                        changes_made = True
 
     if not changes_made:
         if environment == "production" and file_path.startswith("http"):
@@ -311,18 +428,19 @@ async def edit_pdf(file_path: str, instruction: str):
         doc.save(temp_output)
         doc.close()
         
-        # Upload to S3
-        bucket_name = os.environ['AWS_BUCKET_NAME']
-        file_key = f"pdfs/{new_file_name}"
-        
-        with open(temp_output, 'rb') as f:
-            s3_client.upload_fileobj(f, bucket_name, file_key, ExtraArgs={'ContentType': 'application/pdf'})
+        # Upload to S3 (commented out for local development)
+        # bucket_name = os.environ['AWS_BUCKET_NAME']
+        # file_key = f"pdfs/{new_file_name}"
+        # with open(temp_output, 'rb') as f:
+        #     s3_client.upload_fileobj(f, bucket_name, file_key, ExtraArgs={'ContentType': 'application/pdf'})
         
         # Clean up temporary files
         os.unlink(local_path)
         os.unlink(temp_output)
         
-        edited_pdf_url = f"https://{bucket_name}.s3.amazonaws.com/{file_key}"
+        # edited_pdf_url = f"https://{bucket_name}.s3.amazonaws.com/{file_key}"
+        edited_pdf_url = f"/pdfs/{new_file_name}"
+        edited_pdf_path = temp_output
     else:
         # Save locally
         os.makedirs('pdfs', exist_ok=True)
@@ -335,5 +453,6 @@ async def edit_pdf(file_path: str, instruction: str):
     return {
         "success": True, 
         "editedPdfUrl": edited_pdf_url,
+        "edited_file_path": edited_pdf_path,
         "changes": f"Changed '{original_text}' to '{new_text}'."
     }

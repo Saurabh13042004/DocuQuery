@@ -112,14 +112,18 @@ async def ask_question(
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
         
-    pdf_text = await pdf_service.extract_text_from_pdf(document.file_path)
+    # Use the latest edited file if available, otherwise use original
+    current_file_path = document.edited_file_path if document.edited_file_path else document.file_path
+    pdf_text = await pdf_service.extract_text_from_pdf(current_file_path)
     
     # Use the process_user_input function instead of answer_question
     # This will handle both questions and edit requests
     result = await pdf_service.process_user_input(
         question_request.question, 
         pdf_text, 
-        document.file_path
+        current_file_path,
+        document,
+        db
     )
     
     # Return the full result (includes answer, is_edit flag, and editedPdfUrl if applicable)

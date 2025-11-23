@@ -10,6 +10,7 @@ class Document(Base):
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String, index=True)
     file_path = Column(String)
+    edited_file_path = Column(String, nullable=True)  # Track latest edited version
     upload_date = Column(DateTime, default=datetime.utcnow)
     user_id = Column(Integer, ForeignKey("users.id"))
     
