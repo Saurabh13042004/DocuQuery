@@ -22,6 +22,7 @@ import { AuthProvider } from './context/AuthContext';
 import { SearchProvider } from './context/SearchContext';
 import ProtectedRoute from './ProtectedRoute';
 import ProfilePage from './pages/ProfilePage';
+import PlansPage from './pages/PlansPage';
 
 // Placeholder pages for routes that aren't fully implemented yet
 
@@ -124,6 +125,7 @@ function App() {
             <Route path="tools" element={<ToolsPage />} />
             <Route path="trash" element={<TrashPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="plans" element={<PlansPage />} />
           </Route>
         </Routes>
       </AuthProvider>

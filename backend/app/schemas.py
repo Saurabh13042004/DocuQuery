@@ -1,61 +1,97 @@
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
-from typing import List
+from typing import List, Optional
+
 
 class DocumentCreate(BaseModel):
     filename: str
     file_path: str
 
+
 class QuestionRequest(BaseModel):
     question: str
     id: int
-    
+
+
 class MessageBase(BaseModel):
     content: str
     is_user: bool
 
+
 class MessageCreate(MessageBase):
     pass
 
+
 class Message(MessageBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     document_id: int
     timestamp: datetime
-    
-    class Config:
-        orm_mode = True
 
-# Update DocumentResponse to include messages
+
 class DocumentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     filename: str
     file_path: str
     upload_date: datetime
     messages: List[Message] = []
-    
-    class Config:
-        orm_mode = True
+
 
 class UserCreate(BaseModel):
-    name : str
-    email : str
-    password : str
+    name: str
+    email: str
+    password: str
+
 
 class UserLogin(BaseModel):
-    email : str
-    password : str
+    email: str
+    password: str
 
 
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: int
     name: str
     email: str
     is_active: bool
     created_at: datetime
+    credits: int
+    plan: str
+
 
 class Token(BaseModel):
     access_token: str
     token_type: str
     user: UserResponse
+
+
+class UpgradePlanRequest(BaseModel):
+    plan: str
+
+
+class CreditTransactionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    amount: int
+    reason: str
+    created_at: datetime
+
+
+class PlanFeature(BaseModel):
+    name: str
+    price_usd: int
+    monthly_credits: int
+    description: str
+    features: List[str]
+    badge_color: str
+
+
+class PlansResponse(BaseModel):
+    plans: dict
+    current_plan: str
+    credits: int

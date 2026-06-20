@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Send, Download, Share2, Maximize, X, ChevronDown, Edit, Bookmark } from 'lucide-react';
 import { usePdf } from '../context/PdfContext';
+import { useAuth } from '../context/AuthContext';
 import ChatMessage from '../components/ChatMessage';
 import PdfViewer from '../components/PdfViewer';
 import { askQuestion, saveMessage, fetchDocumentMessages } from '../services/api';
@@ -22,6 +23,8 @@ import '../styles/chat-responsive.css';
 const ChatView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { getDocumentById, updateDocument } = usePdf();
+  const { refreshUser } = useAuth();
+  const navigate = useNavigate();
   const document = getDocumentById(id || '');
   
   const [message, setMessage] = useState('');
@@ -128,23 +131,35 @@ const ChatView: React.FC = () => {
       // Update document with messages
       updateDocument(document.id, { messages: finalMessages });
       
-    } catch (error) {
+      // Refresh sidebar credit counter after every AI operation
+      refreshUser().catch(() => {});
+
+    } catch (error: any) {
       console.error('Error getting answer:', error);
-      
-      // Add error message
+
+      // 402 = insufficient credits
+      const is402 = error?.response?.status === 402;
+      const detail = error?.response?.data?.detail;
+      const errorText = is402
+        ? `Not enough credits. ${typeof detail === 'object' ? detail.message : detail} Go to Plans to top up.`
+        : "Sorry, I couldn't process your question. Please try again.";
+
       const errorMessage: MessageType = {
         id: (Date.now() + 1).toString(),
-        content: "Sorry, I couldn't process your question. Please try again.",
+        content: errorText,
         timestamp: new Date().toISOString(),
         isUser: false,
-        sourcePdf: document.name
+        sourcePdf: document.name,
       };
-      
-      // Save error message to backend
+
       await saveMessage(parseInt(document.id), errorMessage.content, false);
-      
       setMessages([...updatedMessages, errorMessage]);
       updateDocument(document.id, { messages: [...updatedMessages, errorMessage] });
+
+      if (is402) {
+        // Small delay so the user reads the message before redirect
+        setTimeout(() => navigate('/app/plans'), 2500);
+      }
       
     } finally {
       setIsLoading(false);

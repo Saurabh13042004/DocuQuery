@@ -1,23 +1,31 @@
-version: '3.8'
-
 services:
   backend:
     build: ./backend
     ports:
       - "8000:8000"
+    volumes:
+      - ./backend:/app
     environment:
-      - ENVIRONMENT=production
-      - SQLITE_CLOUD_URL=${SQLITE_CLOUD_URL}
+      - ENVIRONMENT=development
+      - DATABASE_URL=${DATABASE_URL}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - SECRET_KEY=${SECRET_KEY}
       - AWS_ACCESS_KEY=${AWS_ACCESS_KEY}
       - AWS_SECRET_KEY=${AWS_SECRET_KEY}
       - AWS_REGION=${AWS_REGION}
       - AWS_BUCKET_NAME=${AWS_BUCKET_NAME}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
+      - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
+      - UPSTASH_VECTOR_REST_URL=${UPSTASH_VECTOR_REST_URL}
+      - UPSTASH_VECTOR_REST_TOKEN=${UPSTASH_VECTOR_REST_TOKEN}
 
   frontend:
     build: ./frontend
     ports:
       - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     depends_on:
       - backend
     environment:

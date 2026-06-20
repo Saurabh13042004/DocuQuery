@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { X, Upload, File, AlertCircle } from 'lucide-react';
 import { usePdf } from '../context/PdfContext';
+import { useAuth } from '../context/AuthContext';
 import { uploadPDF } from '../services/api';
 
 interface UploadModalProps {
@@ -9,6 +10,7 @@ interface UploadModalProps {
 
 const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
   const { addDocument, fetchUserDocuments } = usePdf();
+  const { refreshUser } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -67,16 +69,20 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
     setError(null);
     
     try {
-      const uploadedDocument = await uploadPDF(file);
-      
-      // After successful upload, refresh the documents list
+      await uploadPDF(file);
       await fetchUserDocuments();
-      
+      refreshUser().catch(() => {}); // update sidebar credit count
       setIsUploading(false);
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload error:', error);
-      setError('Failed to upload the document. Please try again.');
+      const is402 = error?.response?.status === 402;
+      const detail = error?.response?.data?.detail;
+      setError(
+        is402
+          ? `Not enough credits. ${typeof detail === 'object' ? detail.message : detail}`
+          : 'Failed to upload the document. Please try again.'
+      );
       setIsUploading(false);
     }
   };
