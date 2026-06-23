@@ -74,20 +74,32 @@ def _embed_single(text: str) -> list[float]:
     return _embed_batch([text])[0]
 
 
-async def index_document(document_id: int, text: str) -> int:
-    """Chunk, embed, compute sparse, and upsert PDF text into the hybrid index."""
-    chunks = _chunk_text(text)
-    if not chunks:
+async def index_document(document_id: int, text: str, pages: list[str] | None = None) -> int:
+    """Chunk, embed, and upsert into the hybrid index.
+
+    If *pages* is provided (one string per PDF page), chunks are created
+    per page so each vector carries an accurate page_number in its metadata.
+    Otherwise the full *text* is chunked without page attribution.
+    """
+    if pages:
+        # Build (chunk_text, page_number) pairs chunked within each page
+        chunk_pairs: list[tuple[str, int]] = []
+        for page_num, page_text in enumerate(pages, start=1):
+            for chunk in _chunk_text(page_text):
+                chunk_pairs.append((chunk, page_num))
+    else:
+        chunk_pairs = [(chunk, 0) for chunk in _chunk_text(text)]
+
+    if not chunk_pairs:
         return 0
 
     loop = asyncio.get_event_loop()
+    chunks_only = [c for c, _ in chunk_pairs]
 
-    # Batch embed dense vectors
     EMBED_BATCH = 50
-    all_embeddings = []
-    for i in range(0, len(chunks), EMBED_BATCH):
-        batch = chunks[i:i + EMBED_BATCH]
-        embeddings = await loop.run_in_executor(None, _embed_batch, batch)
+    all_embeddings: list[list[float]] = []
+    for i in range(0, len(chunks_only), EMBED_BATCH):
+        embeddings = await loop.run_in_executor(None, _embed_batch, chunks_only[i:i + EMBED_BATCH])
         all_embeddings.extend(embeddings)
 
     vectors = [
@@ -98,22 +110,26 @@ async def index_document(document_id: int, text: str) -> int:
             metadata={
                 "document_id": document_id,
                 "chunk_index": i,
-                "text": chunk
+                "page_number": page_num,
+                "text": chunk,
             }
         )
-        for i, (chunk, embedding) in enumerate(zip(chunks, all_embeddings))
+        for i, ((chunk, page_num), embedding) in enumerate(zip(chunk_pairs, all_embeddings))
     ]
 
-    # Upsert in batches of 100
     UPSERT_BATCH = 100
     for i in range(0, len(vectors), UPSERT_BATCH):
         await loop.run_in_executor(None, _index.upsert, vectors[i:i + UPSERT_BATCH])
 
-    return len(chunks)
+    return len(vectors)
 
 
-async def query_relevant_chunks(document_id: int, question: str) -> str:
-    """Hybrid query: dense semantic + sparse keyword, filtered by document."""
+async def query_relevant_chunks(document_id: int, question: str) -> dict:
+    """Hybrid query returning context text and source page numbers.
+
+    Returns {"context": str, "pages": list[int]}.
+    Context has [Page N] prefixes so the LLM can cite them naturally.
+    """
     loop = asyncio.get_event_loop()
     dense = await loop.run_in_executor(None, _embed_single, question)
     sparse = _compute_sparse(question)
@@ -129,12 +145,21 @@ async def query_relevant_chunks(document_id: int, question: str) -> str:
         )
     )
 
-    chunks = [
-        r.metadata["text"]
-        for r in results
-        if r.metadata and "text" in r.metadata
-    ]
-    return "\n\n---\n\n".join(chunks)
+    parts: list[str] = []
+    pages: list[int] = []
+    for r in results:
+        if not (r.metadata and "text" in r.metadata):
+            continue
+        page_num = r.metadata.get("page_number", 0)
+        text = r.metadata["text"]
+        if page_num:
+            parts.append(f"[Page {page_num}]\n{text}")
+            if page_num not in pages:
+                pages.append(page_num)
+        else:
+            parts.append(text)
+
+    return {"context": "\n\n---\n\n".join(parts), "pages": sorted(pages)}
 
 
 async def delete_document(document_id: int, chunk_count: int):

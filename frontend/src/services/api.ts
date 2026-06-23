@@ -61,6 +61,7 @@ export interface QuestionResponse {
   is_edit?: boolean;
   editedPdfUrl?: string;
   credits_remaining?: number;
+  citations?: string[];
 }
 
 export interface PlansResponse {
@@ -154,4 +155,19 @@ export const saveMessage = async (documentId: number, content: string, isUser: b
     is_user: isUser,
   });
   return response.data;
+};
+
+export const exportChat = async (documentId: number, format: 'md' | 'txt' = 'md'): Promise<void> => {
+  const response = await api.get(`/documents/${documentId}/export`, {
+    params: { format },
+    responseType: 'blob',
+  });
+  const url = URL.createObjectURL(new Blob([response.data]));
+  const a = window.document.createElement('a');
+  a.href = url;
+  a.download = `chat_export.${format}`;
+  window.document.body.appendChild(a);
+  a.click();
+  window.document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 };

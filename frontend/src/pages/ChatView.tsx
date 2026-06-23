@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Download, Share2, Maximize, X, ChevronDown, Edit, Bookmark } from 'lucide-react';
+import { Send, Download, Share2, Maximize, X, ChevronDown, Edit, Bookmark, FileDown } from 'lucide-react';
 import { usePdf } from '../context/PdfContext';
 import { useAuth } from '../context/AuthContext';
 import ChatMessage from '../components/ChatMessage';
 import PdfViewer from '../components/PdfViewer';
-import { askQuestion, saveMessage, fetchDocumentMessages } from '../services/api';
+import { askQuestion, saveMessage, fetchDocumentMessages, exportChat } from '../services/api';
 import { MessageType } from '../types';
 import { Button } from '@/components/ui/button';
 
@@ -20,20 +20,30 @@ import {
 import '../styles/scroll.css';
 import '../styles/chat-responsive.css';
 
+const PROMPT_TEMPLATES = [
+  { label: 'Summarize', prompt: 'Summarize this document in 5 bullet points' },
+  { label: 'Key dates', prompt: 'List all dates and deadlines mentioned in this document' },
+  { label: 'Action items', prompt: 'What are the key action items or next steps in this document?' },
+  { label: 'Explain simply', prompt: 'Explain this document in simple, plain language' },
+  { label: 'Key risks', prompt: 'What are the key risks or concerns in this document?' },
+  { label: 'Main parties', prompt: 'Who are the main parties involved and what are their roles?' },
+];
+
 const ChatView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { getDocumentById, updateDocument } = usePdf();
   const { refreshUser } = useAuth();
   const navigate = useNavigate();
   const document = getDocumentById(id || '');
-  
+
   const [message, setMessage] = useState('');
   const [showPdfViewer, setShowPdfViewer] = useState(true);
   const [fullScreenPdf, setFullScreenPdf] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<MessageType[]>(document?.messages || []);
   const [currentPdfUrl, setCurrentPdfUrl] = useState<string | undefined>(undefined);
-  
+  const [isExporting, setIsExporting] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   
@@ -108,7 +118,8 @@ const ChatView: React.FC = () => {
         content: response.answer,
         timestamp: new Date().toISOString(),
         isUser: false,
-        sourcePdf: document.name
+        sourcePdf: document.name,
+        citations: response.citations && response.citations.length > 0 ? response.citations : undefined,
       };
       
       // If this is an edit response, add the edited PDF URL
@@ -174,6 +185,18 @@ const ChatView: React.FC = () => {
   const handleViewEditedPdf = (url: string) => {
     setCurrentPdfUrl(url);
     setShowPdfViewer(true);
+  };
+
+  const handleExport = async () => {
+    if (!document || isExporting) return;
+    setIsExporting(true);
+    try {
+      await exportChat(parseInt(document.id), 'md');
+    } catch (e) {
+      console.error('Export failed', e);
+    } finally {
+      setIsExporting(false);
+    }
   };
   
   const handleDownloadPdf = () => {
@@ -342,12 +365,25 @@ const ChatView: React.FC = () => {
                   </div>
                 </div>
                 
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  <Bookmark className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleExport}
+                    disabled={isExporting || messages.length === 0}
+                    className="h-8 px-2 text-xs gap-1 text-muted-foreground"
+                    title="Export chat as Markdown"
+                  >
+                    <FileDown className="h-3.5 w-3.5" />
+                    {isExporting ? 'Exporting…' : 'Export'}
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <Bookmark className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </header>
-        
+
           {/* Chat Messages */}
           <div className="flex-1 bg-muted/10 overflow-hidden">
             <ScrollArea className="h-full custom-scrollbar message-container">
@@ -418,6 +454,20 @@ const ChatView: React.FC = () => {
           {/* Chat Input */}
           <div className="bg-background border-t p-4 shrink-0">
             <div className="max-w-4xl mx-auto">
+              {/* Prompt template chips */}
+              {messages.length === 0 && (
+                <div className="flex gap-1.5 flex-wrap mb-3">
+                  {PROMPT_TEMPLATES.map((t) => (
+                    <button
+                      key={t.label}
+                      onClick={() => setMessage(t.prompt)}
+                      className="px-2.5 py-1 rounded-full border border-border text-xs text-muted-foreground hover:border-primary hover:text-primary transition-colors bg-background"
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="relative">
                 <Input
                   ref={inputRef}

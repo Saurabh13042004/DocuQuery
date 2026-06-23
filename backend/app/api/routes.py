@@ -1,4 +1,5 @@
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
@@ -131,7 +132,8 @@ async def upload_pdf(
     db.refresh(db_document)
 
     pdf_text = await pdf_service.extract_text_from_pdf(file_location)
-    await vector_service.index_document(db_document.id, pdf_text)
+    pages = await pdf_service.extract_pages(file_location)
+    await vector_service.index_document(db_document.id, pdf_text, pages=pages)
 
     return db_document
 
@@ -239,6 +241,52 @@ async def add_message(
     db.commit()
     db.refresh(db_message)
     return db_message
+
+
+@router.get("/documents/{document_id}/export")
+async def export_chat(
+    document_id: int,
+    format: str = Query(default="md", pattern="^(md|txt)$"),
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    document = db.query(models.Document).filter(
+        models.Document.id == document_id,
+        models.Document.user_id == current_user.id,
+    ).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    messages = (
+        db.query(models.Message)
+        .filter(models.Message.document_id == document_id)
+        .order_by(models.Message.timestamp.asc())
+        .all()
+    )
+
+    exported_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    lines = [
+        f"# Chat Export — {document.filename}",
+        f"Exported: {exported_at}",
+        "",
+    ]
+    for msg in messages:
+        role = "**You**" if msg.is_user else "**DocuQuery**"
+        ts = msg.timestamp.strftime("%H:%M") if msg.timestamp else ""
+        lines.append(f"### {role}  _{ts}_")
+        lines.append(msg.content)
+        lines.append("")
+
+    content = "\n".join(lines)
+    safe_name = document.filename.replace(" ", "_").rstrip(".pdf")
+    filename = f"chat_{safe_name}.md" if format == "md" else f"chat_{safe_name}.txt"
+    media_type = "text/markdown" if format == "md" else "text/plain"
+
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/documents/{document_id}/messages", response_model=List[schemas.Message])

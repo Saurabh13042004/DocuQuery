@@ -20,6 +20,7 @@ s3_client = boto3.client(
 
 _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 MODEL = "gemini-2.5-flash"
+FALLBACK_MODEL = "gemini-1.5-flash"
 environment = os.environ['ENVIRONMENT']
 
 print(f"PDF Service initialized in {environment} environment.")
@@ -36,6 +37,9 @@ Rules:
 - Use `edit_pdf` when the user wants to change, replace, update, or modify text.
 - Use `summarize` when the user asks for an overview or summary.
 - Always base answers on the document context provided.
+- When the context contains [Page N] markers, cite the page number naturally in your answer.
+  Example: "According to page 3, the notice period is 30 days."
+  If multiple pages are relevant, cite all of them.
 - Be concise and helpful."""
 
 _PDF_TOOLS = types.Tool(
@@ -228,41 +232,44 @@ async def save_pdf(file) -> str:
         return location
 
 
-async def extract_text_from_pdf(file_path: str) -> str:
+async def _resolve_local(file_path: str):
+    """Download S3 URL to a temp file if in production, else return path as-is."""
     if environment == "production" and file_path.startswith("http"):
         import tempfile
         import requests
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
         tmp.write(requests.get(file_path).content)
         tmp.close()
-        local = tmp.name
-    else:
-        local = file_path
+        return tmp.name, True
+    return file_path, False
 
+
+async def extract_text_from_pdf(file_path: str) -> str:
+    local, is_tmp = await _resolve_local(file_path)
     doc = fitz.open(local)
     text = "".join(page.get_text() for page in doc)
     doc.close()
-
-    if environment == "production" and file_path.startswith("http"):
+    if is_tmp:
         os.unlink(local)
-
     return text
+
+
+async def extract_pages(file_path: str) -> list[str]:
+    """Return a list of text strings, one per page (1-indexed order)."""
+    local, is_tmp = await _resolve_local(file_path)
+    doc = fitz.open(local)
+    pages = [page.get_text() for page in doc]
+    doc.close()
+    if is_tmp:
+        os.unlink(local)
+    return pages
 
 # ---------------------------------------------------------------------------
 # Core PDF edit (no extra LLM call — Gemini provides original/new directly)
 # ---------------------------------------------------------------------------
 
 async def _perform_pdf_edit(file_path: str, original_text: str, new_text: str) -> dict:
-    # Resolve local path in production
-    if environment == "production" and file_path.startswith("http"):
-        import tempfile
-        import requests
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
-        tmp.write(requests.get(file_path).content)
-        tmp.close()
-        local_path = tmp.name
-    else:
-        local_path = file_path
+    local_path, is_tmp = await _resolve_local(file_path)
 
     doc = fitz.open(local_path)
     changes_made = False
@@ -343,7 +350,7 @@ async def _perform_pdf_edit(file_path: str, original_text: str, new_text: str) -
                             print(f"[edit] ERROR all insert attempts failed: {e2}")
 
     if not changes_made:
-        if environment == "production" and file_path.startswith("http"):
+        if is_tmp:
             os.unlink(local_path)
         doc.close()
         return {"success": False, "message": f"Could not find '{original_text}' in the document."}
@@ -357,7 +364,7 @@ async def _perform_pdf_edit(file_path: str, original_text: str, new_text: str) -
     doc.save(edited_path)
     doc.close()
 
-    if environment == "production" and file_path.startswith("http"):
+    if is_tmp:
         os.unlink(local_path)
 
     return {
@@ -380,7 +387,9 @@ async def process_user_input(
     document_id = document.id if document else 0
 
     # 1. Retrieve relevant context via RAG
-    relevant_context = await vector_service.query_relevant_chunks(document_id, question)
+    rag = await vector_service.query_relevant_chunks(document_id, question)
+    relevant_context = rag["context"]
+    source_pages: list[int] = rag["pages"]
     if not relevant_context:
         # Fallback: use first 3000 chars of full text if index is empty
         relevant_context = pdf_text[:3000]
@@ -419,8 +428,27 @@ async def process_user_input(
         )
     except genai_errors.ClientError as e:
         if e.code == 429:
-            return {"answer": "The AI service is temporarily rate-limited. Please wait a minute and try again.", "is_edit": False}
+            return {"answer": "The AI service is temporarily rate-limited. Please wait a moment and try again.", "is_edit": False}
         raise
+    except genai_errors.ServerError as e:
+        if e.code != 503:
+            raise
+        # 503: retry once with the fallback model before giving up
+        try:
+            response = _client.models.generate_content(
+                model=FALLBACK_MODEL,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=_SYSTEM_INSTRUCTION,
+                    tools=[_PDF_TOOLS],
+                    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+                    tool_config=types.ToolConfig(
+                        function_calling_config=types.FunctionCallingConfig(mode="ANY")
+                    )
+                )
+            )
+        except Exception:
+            return {"answer": "Gemini is experiencing high demand right now. Please try again in a moment.", "is_edit": False}
 
     # 5. Dispatch based on which tool Gemini chose
     result = None
@@ -433,7 +461,7 @@ async def process_user_input(
             answer = func.args.get(key, "")
             redis_service.add_message(document_id, "user", question)
             redis_service.add_message(document_id, "assistant", answer)
-            result = {"answer": answer, "is_edit": False}
+            result = {"answer": answer, "is_edit": False, "citations": [str(p) for p in source_pages]}
 
         elif func.name == "edit_pdf":
             original_text = func.args.get("original_text", "")
