@@ -1,13 +1,14 @@
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, UploadFile, File, Form, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from typing import List
 import jwt
 
 from .. import models, schemas, database
-from ..services import auth_service, pdf_service, vector_service, redis_service, credit_service
+from ..services import auth_service, pdf_service, vector_service, redis_service, credit_service, team_service, email_service, blob_service
 
 router = APIRouter()
 security = HTTPBearer()
@@ -62,6 +63,31 @@ async def login(user_credentials: schemas.UserLogin, db: Session = Depends(datab
     return {"access_token": token, "token_type": "bearer", "user": user}
 
 
+@router.post("/forgot-password", response_model=schemas.MessageOut)
+async def forgot_password(
+    body: schemas.ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(database.get_db),
+):
+    # Same response whether or not the account exists, so this can't be used to
+    # find out who has an account. Sending happens after the response for the
+    # same reason (no timing difference).
+    user = auth_service.get_user_by_email(db, body.email.strip())
+    if user and user.is_active:
+        token = auth_service.create_reset_token(user)
+        background_tasks.add_task(
+            email_service.send_password_reset_email,
+            user.email, user.name, token, auth_service.RESET_TOKEN_EXPIRE_MINUTES,
+        )
+    return {"message": "If an account exists for that email, a reset link is on its way."}
+
+
+@router.post("/reset-password", response_model=schemas.MessageOut)
+async def reset_password(body: schemas.ResetPasswordRequest, db: Session = Depends(database.get_db)):
+    auth_service.reset_password(db, body.token, body.password)
+    return {"message": "Password updated. You can sign in with your new password."}
+
+
 # ---------------------------------------------------------------------------
 # User / credits / plans
 # ---------------------------------------------------------------------------
@@ -113,9 +139,16 @@ async def credit_history(
 @router.post("/upload", response_model=schemas.DocumentResponse)
 async def upload_pdf(
     file: UploadFile = File(...),
+    shared: bool = Form(False),
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    member = team_service.get_membership(db, current_user)
+    if member and member.role not in team_service.CAN_EDIT:
+        raise HTTPException(status_code=403, detail="Viewers can't upload documents")
+    if shared and not member:
+        raise HTTPException(status_code=400, detail="Join a team to share documents")
+
     # Deduct 2 credits before doing any work
     credit_service.check_and_deduct(db, current_user, "upload")
 
@@ -126,6 +159,7 @@ async def upload_pdf(
         file_path=file_location,
         upload_date=datetime.now(timezone.utc),
         user_id=current_user.id,
+        team_id=member.team_id if shared else None,
     )
     db.add(db_document)
     db.commit()
@@ -143,11 +177,34 @@ async def get_documents(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    member = team_service.get_membership(db, current_user)
+    mine = (models.Document.user_id == current_user.id) & models.Document.team_id.is_(None)
     return (
         db.query(models.Document)
-        .filter(models.Document.user_id == current_user.id)
+        .filter(or_(mine, models.Document.team_id == member.team_id) if member else mine)
         .order_by(models.Document.upload_date.desc())
         .all()
+    )
+
+
+@router.get("/documents/{document_id}/file")
+async def get_document_file(
+    document_id: int,
+    edited: bool = False,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Stream the PDF (or its latest edited version) — storage is private, so access is checked here."""
+    document, _ = team_service.get_document(db, current_user, document_id)
+    path = (document.edited_file_path if edited else None) or document.file_path
+    try:
+        data = await pdf_service.read_file(path)
+    except (FileNotFoundError, OSError):
+        raise HTTPException(status_code=404, detail="File not found")
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={"Cache-Control": "private, no-store"},
     )
 
 
@@ -157,17 +214,21 @@ async def delete_document(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    document = db.query(models.Document).filter(
-        models.Document.id == document_id,
-        models.Document.user_id == current_user.id,
-    ).first()
+    document, role = team_service.get_document(db, current_user, document_id)
+    if not team_service.can_delete(document, current_user, role):
+        raise HTTPException(status_code=403, detail="You don't have permission to delete this document")
 
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-
+    stored_files = [document.file_path, document.edited_file_path]
+    db.query(models.Comment).filter(models.Comment.document_id == document_id).delete()
     db.delete(document)
     db.commit()
     redis_service.clear_history(document_id)
+    for path in stored_files:
+        if blob_service.is_blob_key(path):
+            try:
+                await blob_service.delete(path)
+            except Exception:
+                pass  # the document is gone either way; an orphaned object is harmless
     return {"message": "Document deleted"}
 
 
@@ -177,13 +238,7 @@ async def ask_question(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    document = db.query(models.Document).filter(
-        models.Document.id == question_request.id,
-        models.Document.user_id == current_user.id,
-    ).first()
-
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    document, role = team_service.get_document(db, current_user, question_request.id)
 
     # Deduct 1 credit upfront (minimum for any question)
     credit_service.check_and_deduct(db, current_user, "ask")
@@ -197,6 +252,7 @@ async def ask_question(
         current_file_path,
         document,
         db,
+        allow_edit=role in team_service.CAN_EDIT,
     )
 
     # Edits cost 1 extra credit (total 2) on top of the base ask credit
@@ -223,13 +279,7 @@ async def add_message(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    document = db.query(models.Document).filter(
-        models.Document.id == document_id,
-        models.Document.user_id == current_user.id,
-    ).first()
-
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    document, role = team_service.get_document(db, current_user, document_id)
 
     db_message = models.Message(
         document_id=document_id,
@@ -250,12 +300,7 @@ async def export_chat(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    document = db.query(models.Document).filter(
-        models.Document.id == document_id,
-        models.Document.user_id == current_user.id,
-    ).first()
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    document, role = team_service.get_document(db, current_user, document_id)
 
     messages = (
         db.query(models.Message)
@@ -295,13 +340,7 @@ async def get_messages(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    document = db.query(models.Document).filter(
-        models.Document.id == document_id,
-        models.Document.user_id == current_user.id,
-    ).first()
-
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    document, role = team_service.get_document(db, current_user, document_id)
 
     return (
         db.query(models.Message)

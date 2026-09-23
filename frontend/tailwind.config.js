@@ -5,7 +5,33 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Montserrat', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['Manrope', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['"DM Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+      },
+      keyframes: {
+        rise: {
+          from: { opacity: '0', transform: 'translateY(16px)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        'float-y': {
+          '0%, 100%': { translate: '0 0' },
+          '50%': { translate: '0 -10px' },
+        },
+        'grid-drift': {
+          to: { backgroundPosition: '31px 31px' },
+        },
+        shimmer: {
+          '100%': { transform: 'translateX(100%)' },
+        },
+        'upload-slide': {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(300%)' },
+        },
+      },
+      animation: {
+        rise: 'rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both',
+        'float-y': 'float-y 7s ease-in-out infinite',
+        'grid-drift': 'grid-drift 24s linear infinite',
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -43,6 +69,7 @@ export default {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
         },
+        success: "hsl(var(--success))",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

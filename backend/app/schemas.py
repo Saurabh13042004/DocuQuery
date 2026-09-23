@@ -37,6 +37,7 @@ class DocumentResponse(BaseModel):
     filename: str
     file_path: str
     upload_date: datetime
+    team_id: Optional[int] = None
     messages: List[Message] = []
 
 
@@ -49,6 +50,19 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     email: str
     password: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str
+
+
+class MessageOut(BaseModel):
+    message: str
 
 
 class UserResponse(BaseModel):
@@ -95,3 +109,27 @@ class PlansResponse(BaseModel):
     plans: dict
     current_plan: str
     credits: int
+
+
+class TeamCreate(BaseModel):
+    name: str
+
+
+class TeamInviteRequest(BaseModel):
+    email: str
+    role: str = "editor"
+
+
+class RoleUpdate(BaseModel):
+    role: str
+
+
+class PromptCreate(BaseModel):
+    title: str
+    prompt: str
+    category: str = "General"
+
+
+class CommentCreate(BaseModel):
+    content: str
+    page: Optional[int] = None

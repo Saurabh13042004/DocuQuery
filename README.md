@@ -2,14 +2,14 @@
 
 ## Overview
 
-DocuQuery is an intelligent document query system that allows users to upload PDF documents and ask questions about their content using advanced natural language processing. The application leverages LangChain integrated with Google's Generative AI (Gemini 1.5 Flash) for powerful and efficient question answering. It offers an intuitive interface for document management and real-time, context-aware responses to user queries.
+DocuQuery is an intelligent document query system that allows users to upload PDF documents and ask questions about their content using advanced natural language processing. The application uses OpenAI (gpt-4o-mini with text-embedding-3-small) for powerful and efficient question answering. It offers an intuitive interface for document management and real-time, context-aware responses to user queries.
 
 
 ## ✨ Key Features
 
 - 📄 Upload and process PDF documents with ease
 - 🔍 Ask questions about document content using natural language
-- 🤖 Get AI-powered answers leveraging Gemini 1.5 Flash model
+- 🤖 Get AI-powered answers leveraging OpenAI's gpt-4o-mini model
 - 💾 Efficient document storage and retrieval (local or cloud-based)
 
 ## 🛠 Tech Stack
@@ -17,7 +17,7 @@ DocuQuery is an intelligent document query system that allows users to upload PD
 ### Backend
 - **FastAPI**: High-performance web framework for building APIs
 - **LangChain**: Framework for developing applications powered by language models
-- **Google Generative AI**: Integration with Gemini 1.5 Flash model via ChatGoogleGenerativeAI
+- **OpenAI**: gpt-4o-mini for chat and function calling, text-embedding-3-small for retrieval
 - **SQLite**: Database for document metadata storage in development
 - **SQLite-Cloud**: Database for document metadata storage in production
 - **Python 3.12+**: Core programming language
@@ -28,7 +28,7 @@ DocuQuery is an intelligent document query system that allows users to upload PD
 - **Tailwind CSS**: Utility-first CSS framework for styling
 
 ### Storage
-- **AWS S3**: Cloud storage for PDF documents in production
+- **Upstash Blob**: Private cloud storage for PDF documents (served through the authenticated API)
 - **Local filesystem**: For storing PDFs in development
 
 ### DevOps
@@ -38,8 +38,8 @@ DocuQuery is an intelligent document query system that allows users to upload PD
 
 - Python 3.12 or higher
 - Node.js 14.0 or higher
-- Gemini AI API key
-- AWS account with S3 access
+- OpenAI API key
+- Upstash account with a Blob bucket, plus Redis and Vector (hybrid, 768-dim) databases
 - Docker (for containerized deployment)
 
 ## 🚀 Getting Started
@@ -82,11 +82,8 @@ Create a `.env` file in the backend directory with the following variables:
 
 ```env
 DATABASE_URL=sqlite:///./test.db
-GEMINI_API_KEY=your_gemini_api_key_here
-AWS_ACCESS_KEY=your_aws_access_key
-AWS_SECRET_KEY=your_aws_secret_key
-AWS_BUCKET_NAME=your_s3_bucket_name
-AWS_REGION=your_aws_region
+OPENAI_API_KEY=your_openai_api_key_here
+UPSTASH_BLOB_TOKEN=your_upstash_blob_token
 ENVIRONMENT=development  # Use "production" for the production environment
 ```
 
@@ -111,7 +108,7 @@ docker build -t docuquery .
 
 2. Run the container:
 ```bash
-docker run -p 8000:8000 -e GEMINI_API_KEY=your_key -e AWS_ACCESS_KEY=your_key -e AWS_SECRET_KEY=your_key -e AWS_BUCKET_NAME=your_bucket -e AWS_REGION=your_region docuquery
+docker run -p 8000:8000 -e OPENAI_API_KEY=your_key -e UPSTASH_BLOB_TOKEN=your_token docuquery
 ```
 
 

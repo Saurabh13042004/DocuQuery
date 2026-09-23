@@ -1,592 +1,163 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Loader, 
-  Headphones, 
-  Music, 
-  Cloud, 
-  RefreshCw, 
-  FileText, 
-  FileImage,
-  Presentation,
-  Sparkles,
-  Shield,
-  MessageCircle,
-  Zap,
-  TrendingUp,
-  Calendar,
-  CreditCard,
-  Crown,
-  BarChart3,
-  Activity,
-  RotateCcw
-} from 'lucide-react';
-import { usePdf } from '../context/PdfContext';
-import { useSearch } from '../context/SearchContext';
-import UploadModal from '../components/UploadModal';
-import DashboardHeader from '../components/DashboardHeader';
-
-import { useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo } from 'react';
+import { Link, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
+import { ArrowRight, FileText, Plus, UploadCloud, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+import DocumentBrowser from '../components/app/DocumentBrowser';
+import { EmptyState, PageContainer, PageHeader } from '../components/app/ui';
+import type { AppOutletContext } from '../components/Layout';
+import { useAuth } from '../context/AuthContext';
+import { usePdf } from '../context/PdfContext';
+import { PlanId } from '../types';
 
+const CREDIT_CAP: Record<PlanId, number> = { free: 20, starter: 500, pro: 2000, team: 1500 };
+const PLAN_LABEL: Record<PlanId, string> = { free: 'Free', starter: 'Starter', pro: 'Pro', team: 'Team' };
+
+const greeting = () => {
+  const h = new Date().getHours();
+  return h < 5 ? 'Working late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+};
+
+const Stat: React.FC<{ label: string; children: React.ReactNode; foot?: React.ReactNode; delay: number }> = ({
+  label,
+  children,
+  foot,
+  delay,
+}) => (
+  <div
+    className="animate-rise rounded-xl border bg-card p-4 sm:p-5"
+    style={{ animationDelay: `${delay}ms` }}
+  >
+    <div className="kicker">{label}</div>
+    <div className="mt-3">{children}</div>
+    {foot && <div className="mt-3 text-xs text-muted-foreground">{foot}</div>}
+  </div>
+);
 
 const Dashboard: React.FC = () => {
-  const { documents, fetchUserDocuments } = usePdf();
-  const { searchQuery, setSearchQuery } = useSearch();
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [filterCategory, setFilterCategory] = useState<string>('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [showGoogleDriveAuth, setShowGoogleDriveAuth] = useState(false);
-  const [showConvertModal, setShowConvertModal] = useState(false);
-  const [showAudiobookModal, setShowAudiobookModal] = useState(false);
-
+  const { documents, isLoading, fetchUserDocuments } = usePdf();
+  const { user, team } = useAuth();
+  const { openUpload } = useOutletContext<AppOutletContext>();
   const location = useLocation();
   const navigate = useNavigate();
+  const canUpload = team?.role !== 'viewer';
 
-
-  // Add to Dashboard.tsx, just after the initial useEffect
+  // Other pages can send people here with { openUploadModal: true }.
   useEffect(() => {
-    if (location.state) {
-      // Check if we should open the upload modal
-      if (location.state.openUploadModal) {
-        setShowUploadModal(true);
-      }
-
-
-
-      // Clear the location state after handling
+    const state = location.state as { openUploadModal?: boolean } | null;
+    if (state?.openUploadModal) {
+      openUpload();
       navigate(location.pathname, { replace: true });
     }
-  }, [location]);
+  }, [location, navigate, openUpload]);
 
-  // Refresh documents when the component mounts
   useEffect(() => {
     fetchUserDocuments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
-
-
+  const plan = (user?.plan ?? 'free') as PlanId;
+  const credits = user?.credits ?? 0;
+  const pct = Math.min(100, Math.round((credits / CREDIT_CAP[plan]) * 100));
+  const firstName = user?.name?.split(' ')[0] ?? '';
+  const starred = useMemo(() => documents.filter((d) => d.starred).length, [documents]);
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <DashboardHeader
-        onUploadClick={() => setShowUploadModal(true)}
-        searchQuery={searchQuery || ''}
-        onSearchChange={(value) => setSearchQuery && setSearchQuery(value)}
-        filterCategory={filterCategory}
-        onFilterChange={setFilterCategory}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
+    <PageContainer wide>
+      <PageHeader
+        kicker="Your registry"
+        title={
+          <>
+            {greeting()}
+            {firstName && (
+              <>
+                , <span className="text-primary">{firstName}.</span>
+              </>
+            )}
+          </>
+        }
+        description={
+          isLoading
+            ? 'Loading your documents…'
+            : documents.length === 0
+              ? 'Nothing filed yet. Upload a PDF to ask it questions or edit it.'
+              : `${documents.length} document${documents.length === 1 ? '' : 's'} filed. Open one to ask a question or make an edit.`
+        }
+        actions={
+          canUpload && (
+            <Button onClick={openUpload} size="lg" className="w-full sm:w-auto">
+              <Plus /> Upload PDF
+            </Button>
+          )
+        }
       />
-      
-      {/* Content Area */}
-      <main className="flex-1 overflow-auto">
-        <div className="p-6 space-y-8">
-          {/* Welcome Section */}
-          <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 rounded-lg border">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-foreground mb-2">
-                  Welcome to DocuQuery
-                </h1>
-                <p className="text-muted-foreground">
-                  Transform your documents with AI-powered chat, conversion, and integration tools
-                </p>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="text-right">
-                  <div className="text-2xl font-bold text-primary">{documents.length}</div>
-                  <div className="text-sm text-muted-foreground">Documents</div>
-                </div>
-                <Sparkles className="h-8 w-8 text-primary" />
-              </div>
-            </div>
+
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <Stat label="Documents" delay={40} foot="Filed in your registry">
+          <div className="font-mono text-3xl font-medium leading-none">{documents.length}</div>
+        </Stat>
+        <Stat label="Starred" delay={80} foot="Pinned for quick access">
+          <div className="font-mono text-3xl font-medium leading-none">{starred}</div>
+        </Stat>
+        <Stat
+          label="Credits"
+          delay={120}
+          foot={
+            <Link to="/app/plans" className="inline-flex items-center gap-1 font-bold text-primary hover:underline">
+              {plan === 'free' ? 'Get more credits' : 'Manage credits'} <ArrowRight className="h-3 w-3" />
+            </Link>
+          }
+        >
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-mono text-3xl font-medium leading-none">{credits}</span>
+            <span className="font-mono text-xs text-muted-foreground">/ {CREDIT_CAP[plan].toLocaleString()}</span>
           </div>
-
-          {/* Feature Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Chat & Edit Feature */}
-            <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group border-2 hover:border-primary/50">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-500/10 rounded-xl group-hover:bg-blue-500/20 transition-colors">
-                    <MessageCircle className="h-6 w-6 text-blue-500" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base font-semibold">Chat & Edit</CardTitle>
-                    <p className="text-xs text-muted-foreground">AI-powered conversations</p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Interact with your PDFs using natural language and get intelligent responses.
-                </p>
-                <Button size="sm" className="w-full group-hover:shadow-md transition-shadow">
-                  Start Chatting
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* PDF to Audiobook Feature */}
-            <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group border-2 hover:border-primary/50" onClick={() => setShowAudiobookModal(true)}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-purple-500/10 rounded-xl group-hover:bg-purple-500/20 transition-colors">
-                    <Headphones className="h-6 w-6 text-purple-500" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base font-semibold">PDF to Audio</CardTitle>
-                    <p className="text-xs text-muted-foreground">Text-to-speech conversion</p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Convert your documents into high-quality audiobooks with AI voices.
-                </p>
-                <Button size="sm" className="w-full group-hover:shadow-md transition-shadow">
-                  <Music className="h-4 w-4 mr-2" />
-                  Create Audiobook
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Document Converter Feature */}
-            <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group border-2 hover:border-primary/50" onClick={() => setShowConvertModal(true)}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-orange-500/10 rounded-xl group-hover:bg-orange-500/20 transition-colors">
-                    <RefreshCw className="h-6 w-6 text-orange-500" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base font-semibold">Convert Docs</CardTitle>
-                    <p className="text-xs text-muted-foreground">Multiple format support</p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Convert between PDF, DOC, DOCX, TXT, PPT, and image formats.
-                </p>
-                <Button size="sm" className="w-full group-hover:shadow-md transition-shadow">
-                  <Zap className="h-4 w-4 mr-2" />
-                  Convert Now
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Sync & Integrations Feature */}
-            <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group border-2 hover:border-primary/50" onClick={() => setShowGoogleDriveAuth(true)}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-green-500/10 rounded-xl group-hover:bg-green-500/20 transition-colors">
-                    <Cloud className="h-6 w-6 text-green-500" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base font-semibold">Sync & Import</CardTitle>
-                    <p className="text-xs text-muted-foreground">Cloud integrations</p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Connect with Google Drive, Dropbox, and other cloud platforms.
-                </p>
-                <Button size="sm" className="w-full group-hover:shadow-md transition-shadow">
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Connect Now
-                </Button>
-              </CardContent>
-            </Card>
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#dbe8f9]">
+            <div
+              className={cn('h-full rounded-full transition-[width] duration-700', pct <= 20 ? 'bg-destructive' : 'bg-primary')}
+              style={{ width: `${pct}%` }}
+            />
           </div>
+        </Stat>
+        <Stat
+          label="Plan"
+          delay={160}
+          foot={
+            plan === 'free' ? (
+              <span className="inline-flex items-center gap-1">
+                <Zap className="h-3 w-3 text-primary" /> Starter is $9/mo
+              </span>
+            ) : (
+              'Renews monthly'
+            )
+          }
+        >
+          <div className="text-3xl font-extrabold leading-none tracking-[-0.05em]">{PLAN_LABEL[plan]}</div>
+        </Stat>
+      </div>
 
-          {/* Quick Dashboard Analytics */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Activity Dashboard */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  Quick Dashboard
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{documents.length}</div>
-                    <div className="text-sm text-muted-foreground">PDFs Uploaded</div>
-                  </div>
-                  <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">0</div>
-                    <div className="text-sm text-muted-foreground">Documents Edited</div>
-                  </div>
-                  <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">0</div>
-                    <div className="text-sm text-muted-foreground">Synced Files</div>
-                  </div>
-                  <div className="text-center p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                    <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{documents.filter(d => d.starred).length}</div>
-                    <div className="text-sm text-muted-foreground">Starred Docs</div>
-                  </div>
-                </div>
-                <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Last Activity</span>
-                    <span className="font-medium flex items-center gap-1">
-                      <Activity className="h-3 w-3" />
-                      2 days ago
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Billing & Usage */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  Usage & Billing
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Current Plan */}
-                <div className="flex items-center justify-between p-3 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg border">
-                  <div className="flex items-center gap-2">
-                    <Crown className="h-4 w-4 text-primary" />
-                    <span className="font-medium">Pro Plan</span>
-                  </div>
-                  <span className="text-sm bg-primary text-primary-foreground px-2 py-1 rounded-full">
-                    Active
-                  </span>
-                </div>
-
-                {/* Token Usage */}
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">API Tokens Used</span>
-                    <span className="font-medium">2,450 / 10,000</span>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div className="bg-primary h-2 rounded-full" style={{ width: '24.5%' }}></div>
-                  </div>
-                </div>
-
-                {/* Storage Usage */}
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">Storage Used</span>
-                    <span className="font-medium">156 MB / 5 GB</span>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div className="bg-green-500 h-2 rounded-full" style={{ width: '3.1%' }}></div>
-                  </div>
-                </div>
-
-                {/* Billing Info */}
-                <div className="pt-2 border-t">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Next Billing</span>
-                    <span className="font-medium flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      Oct 29, 2025
-                    </span>
-                  </div>
-                </div>
-
-                {/* Upgrade Button */}
-                <Button variant="outline" size="sm" className="w-full">
-                  <TrendingUp className="h-4 w-4 mr-2" />
-                  Upgrade Plan
+      <DocumentBrowser
+        documents={documents}
+        isLoading={isLoading}
+        tabs
+        empty={
+          <EmptyState
+            icon={<UploadCloud className="h-6 w-6" />}
+            title="File your first PDF"
+            description="Drop in a contract, offer letter or statement. It’s indexed in seconds, then ask it anything or tell it what to change."
+            action={
+              canUpload ? (
+                <Button onClick={openUpload} size="lg">
+                  <FileText /> Upload a PDF
                 </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </main>
-
-      {/* Modals */}
-      {showUploadModal && (
-        <UploadModal onClose={() => setShowUploadModal(false)} />
-      )}
-      
-      {showGoogleDriveAuth && (
-        <GoogleDriveAuthModal onClose={() => setShowGoogleDriveAuth(false)} />
-      )}
-      
-      {showConvertModal && (
-        <ConvertDocumentModal onClose={() => setShowConvertModal(false)} />
-      )}
-      
-      {showAudiobookModal && (
-        <AudiobookModal onClose={() => setShowAudiobookModal(false)} />
-      )}
-    </div>
-  );
-};
-
-// Google Drive Auth Modal Component
-const GoogleDriveAuthModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [isConnecting, setIsConnecting] = useState(false);
-  
-  const handleGoogleAuth = async () => {
-    setIsConnecting(true);
-    // Simulate Google OAuth flow
-    setTimeout(() => {
-      setIsConnecting(false);
-      onClose();
-    }, 2000);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <Card className="w-full max-w-md mx-4">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Cloud className="h-5 w-5 text-green-500" />
-            Connect Google Drive
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Connect your Google Drive to seamlessly sync and import your documents.
-          </p>
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 p-3 border rounded-lg">
-              <Shield className="h-5 w-5 text-green-500" />
-              <div>
-                <div className="font-medium text-sm">Secure Authentication</div>
-                <div className="text-xs text-muted-foreground">OAuth 2.0 protected</div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 p-3 border rounded-lg">
-              <RefreshCw className="h-5 w-5 text-blue-500" />
-              <div>
-                <div className="font-medium text-sm">Auto Sync</div>
-                <div className="text-xs text-muted-foreground">Real-time synchronization</div>
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              onClick={handleGoogleAuth} 
-              disabled={isConnecting}
-              className="flex-1"
-            >
-              {isConnecting ? (
-                <Loader className="h-4 w-4 mr-2 animate-spin" />
               ) : (
-                <Cloud className="h-4 w-4 mr-2" />
-              )}
-              {isConnecting ? 'Connecting...' : 'Connect Google Drive'}
-            </Button>
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-// Convert Document Modal Component
-const ConvertDocumentModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [selectedFromFormat, setSelectedFromFormat] = useState<string>('pdf');
-  const [selectedToFormat, setSelectedToFormat] = useState<string>('');
-  const [isConverting, setIsConverting] = useState(false);
-  
-  const formats = [
-    { id: 'pdf', name: 'PDF Document', icon: FileText, color: 'text-red-500' },
-    { id: 'docx', name: 'Word Document', icon: FileText, color: 'text-blue-500' },
-    { id: 'txt', name: 'Text File', icon: FileText, color: 'text-gray-500' },
-    { id: 'pptx', name: 'PowerPoint', icon: Presentation, color: 'text-orange-500' },
-    { id: 'jpg', name: 'Image (JPG)', icon: FileImage, color: 'text-green-500' },
-    { id: 'png', name: 'Image (PNG)', icon: FileImage, color: 'text-purple-500' },
-  ];
-
-  const handleConvert = async () => {
-    if (!selectedToFormat || selectedFromFormat === selectedToFormat) return;
-    setIsConverting(true);
-    // Simulate conversion process
-    setTimeout(() => {
-      setIsConverting(false);
-      onClose();
-    }, 3000);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <Card className="w-full max-w-lg mx-4">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <RefreshCw className="h-5 w-5 text-orange-500" />
-            Convert Documents
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Convert between different document formats easily.
-          </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* From Format */}
-            <div className="space-y-3">
-              <div className="text-sm font-medium">From:</div>
-              <div className="space-y-2">
-                {formats.map((format) => {
-                  const Icon = format.icon;
-                  return (
-                    <button
-                      key={`from-${format.id}`}
-                      onClick={() => setSelectedFromFormat(format.id)}
-                      className={`w-full p-2 border rounded-lg text-left transition-colors ${
-                        selectedFromFormat === format.id 
-                          ? 'border-primary bg-primary/5' 
-                          : 'hover:bg-muted'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Icon className={`h-4 w-4 ${format.color}`} />
-                        <div className="text-xs font-medium">{format.name}</div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* To Format */}
-            <div className="space-y-3">
-              <div className="text-sm font-medium">To:</div>
-              <div className="space-y-2">
-                {formats.filter(f => f.id !== selectedFromFormat).map((format) => {
-                  const Icon = format.icon;
-                  return (
-                    <button
-                      key={`to-${format.id}`}
-                      onClick={() => setSelectedToFormat(format.id)}
-                      className={`w-full p-2 border rounded-lg text-left transition-colors ${
-                        selectedToFormat === format.id 
-                          ? 'border-primary bg-primary/5' 
-                          : 'hover:bg-muted'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Icon className={`h-4 w-4 ${format.color}`} />
-                        <div className="text-xs font-medium">{format.name}</div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {selectedFromFormat && selectedToFormat && (
-            <div className="p-3 bg-muted/50 rounded-lg">
-              <div className="text-sm text-center">
-                Converting: <span className="font-medium">{formats.find(f => f.id === selectedFromFormat)?.name}</span> → <span className="font-medium">{formats.find(f => f.id === selectedToFormat)?.name}</span>
-              </div>
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <Button 
-              onClick={handleConvert} 
-              disabled={!selectedToFormat || selectedFromFormat === selectedToFormat || isConverting}
-              className="flex-1"
-            >
-              {isConverting ? (
-                <Loader className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-2" />
-              )}
-              {isConverting ? 'Converting...' : 'Start Conversion'}
-            </Button>
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
-// Audiobook Modal Component
-const AudiobookModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [selectedVoice, setSelectedVoice] = useState('natural');
-  const [isGenerating, setIsGenerating] = useState(false);
-  
-  const voices = [
-    { id: 'natural', name: 'Natural Voice', description: 'Human-like, clear pronunciation' },
-    { id: 'professional', name: 'Professional', description: 'Business-ready, authoritative' },
-    { id: 'casual', name: 'Casual', description: 'Friendly, conversational tone' },
-  ];
-
-  const handleGenerate = async () => {
-    setIsGenerating(true);
-    // Simulate audiobook generation
-    setTimeout(() => {
-      setIsGenerating(false);
-      onClose();
-    }, 4000);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <Card className="w-full max-w-md mx-4">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Headphones className="h-5 w-5 text-purple-500" />
-            Create Audiobook
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Convert your PDF to a high-quality audiobook with AI-powered voice synthesis.
-          </p>
-          <div className="space-y-3">
-            <div className="text-sm font-medium">Select voice style:</div>
-            {voices.map((voice) => (
-              <button
-                key={voice.id}
-                onClick={() => setSelectedVoice(voice.id)}
-                className={`w-full p-3 border rounded-lg text-left transition-colors ${
-                  selectedVoice === voice.id 
-                    ? 'border-primary bg-primary/5' 
-                    : 'hover:bg-muted'
-                }`}
-              >
-                <div className="font-medium text-sm">{voice.name}</div>
-                <div className="text-xs text-muted-foreground">{voice.description}</div>
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              onClick={handleGenerate} 
-              disabled={isGenerating}
-              className="flex-1"
-            >
-              {isGenerating ? (
-                <Loader className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Music className="h-4 w-4 mr-2" />
-              )}
-              {isGenerating ? 'Generating...' : 'Generate Audiobook'}
-            </Button>
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+                <p className="text-sm text-muted-foreground">Your team role is view-only, so uploads are turned off.</p>
+              )
+            }
+          />
+        }
+      />
+    </PageContainer>
   );
 };
 

@@ -1,185 +1,228 @@
-import React, { useState, useRef } from 'react';
-import { X, Upload, File, AlertCircle } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { AlertCircle, CheckCircle2, FileText, Loader2, UploadCloud, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { usePdf } from '../context/PdfContext';
 import { useAuth } from '../context/AuthContext';
+import axios from 'axios';
 import { uploadPDF } from '../services/api';
 
 interface UploadModalProps {
   onClose: () => void;
 }
 
+const MAX_MB = 10;
+const UPLOAD_COST = 2; // credits — keep in step with COSTS["upload"] in the backend
+
 const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
-  const { addDocument, fetchUserDocuments } = usePdf();
-  const { refreshUser } = useAuth();
+  const { fetchUserDocuments } = usePdf();
+  const { refreshUser, team, user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-  
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-  };
-  
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setIsDragging(false);
-    
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      validateAndSetFile(files[0]);
-    }
-  };
-  
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      validateAndSetFile(e.target.files[0]);
-    }
-  };
-  
-  const validateAndSetFile = (file: File) => {
+  const [shared, setShared] = useState(true);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !isUploading && onClose();
+    window.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [isUploading, onClose]);
+
+  const pick = (candidate: File | undefined) => {
+    if (!candidate) return;
     setError(null);
-    
-    // Check if file is a PDF
-    if (file.type !== 'application/pdf') {
-      setError('Please upload a PDF file');
+    if (candidate.type !== 'application/pdf' && !candidate.name.toLowerCase().endsWith('.pdf')) {
+      setError('That isn’t a PDF. Choose a .pdf file.');
       return;
     }
-    
-    // Check file size (10MB limit)
-    if (file.size > 10 * 1024 * 1024) {
-      setError('File size exceeds 10MB limit');
+    if (candidate.size > MAX_MB * 1024 * 1024) {
+      setError(`That file is over the ${MAX_MB} MB limit.`);
       return;
     }
-    
-    setFile(file);
+    setFile(candidate);
   };
-  
+
   const handleUpload = async () => {
-    if (!file) return;
-    
+    if (!file || isUploading) return;
     setIsUploading(true);
     setError(null);
-    
     try {
-      await uploadPDF(file);
+      await uploadPDF(file, !!team && shared);
       await fetchUserDocuments();
-      refreshUser().catch(() => {}); // update sidebar credit count
-      setIsUploading(false);
+      refreshUser().catch(() => {}); // keep the credit counter live
       onClose();
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      const is402 = error?.response?.status === 402;
-      const detail = error?.response?.data?.detail;
+    } catch (e) {
+      const res = axios.isAxiosError(e) ? e.response : undefined;
+      const detail = res?.data?.detail;
       setError(
-        is402
-          ? `Not enough credits. ${typeof detail === 'object' ? detail.message : detail}`
-          : 'Failed to upload the document. Please try again.'
+        res?.status === 402
+          ? `Not enough credits. ${typeof detail === 'object' ? detail?.message ?? '' : detail ?? ''}`.trim()
+          : 'Couldn’t upload this document. Please try again.',
       );
       setIsUploading(false);
     }
   };
-  
-  const handleBrowseClick = () => {
-    fileInputRef.current?.click();
-  };
-  
+
+  const enough = (user?.credits ?? UPLOAD_COST) >= UPLOAD_COST;
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">Upload PDF</h2>
-          <button 
+    <div className="fixed inset-0 z-[60] grid place-items-end p-0 sm:place-items-center sm:p-4">
+      <div
+        className="absolute inset-0 animate-in fade-in bg-foreground/40 backdrop-blur-[2px] duration-200"
+        onClick={() => !isUploading && onClose()}
+        aria-hidden
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="upload-title"
+        className="relative w-full max-w-[480px] animate-in fade-in slide-in-from-bottom-4 rounded-t-2xl border bg-card shadow-[0_30px_80px_rgba(16,33,62,0.25)] duration-300 sm:rounded-2xl"
+      >
+        <div className="flex items-start justify-between gap-4 p-5 pb-0 sm:p-6 sm:pb-0">
+          <div>
+            <div className="kicker mb-2">New accession</div>
+            <h2 id="upload-title" className="text-2xl font-extrabold tracking-[-0.05em]">
+              Upload a PDF
+            </h2>
+          </div>
+          <button
+            type="button"
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-500 focus:outline-none"
+            disabled={isUploading}
+            aria-label="Close"
+            className="grid h-9 w-9 place-items-center rounded-[9px] text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
-        
-        <div className="p-6">
+
+        <div className="p-5 sm:p-6">
           <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-lg p-8 text-center ${
-              isDragging 
-                ? 'border-indigo-500 bg-indigo-50' 
-                : file 
-                  ? 'border-green-500 bg-green-50' 
-                  : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'
-            }`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragging(false);
+              pick(e.dataTransfer.files[0]);
+            }}
+            className={cn(
+              'relative overflow-hidden rounded-xl border-2 border-dashed px-5 py-9 text-center transition-all duration-200',
+              isDragging
+                ? 'scale-[1.01] border-primary bg-accent'
+                : file
+                  ? 'border-success/50 bg-success/5'
+                  : 'border-[#c8dafa] bg-[#f7faff] hover:border-primary/60',
+            )}
           >
             <input
-              ref={fileInputRef}
+              ref={inputRef}
               type="file"
-              accept=".pdf"
-              onChange={handleFileChange}
-              className="hidden"
+              accept="application/pdf,.pdf"
+              className="sr-only"
+              tabIndex={-1}
+              onChange={(e) => pick(e.target.files?.[0])}
             />
-            
+
             {file ? (
-              <div className="flex items-center justify-center">
-                <div className="bg-white p-2 rounded-lg shadow-sm mr-3">
-                  <File className="h-8 w-8 text-indigo-600" />
+              <div className="flex items-center gap-3 text-left">
+                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-card text-primary shadow-[0_8px_18px_rgba(70,109,165,0.13)]">
+                  <FileText className="h-6 w-6" />
                 </div>
-                <div className="text-left">
-                  <p className="font-medium text-gray-900 truncate max-w-[180px]">{file.name}</p>
-                  <p className="text-sm text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold">{file.name}</p>
+                  <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                    {(file.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
                 </div>
+                {!isUploading && (
+                  <button
+                    type="button"
+                    onClick={() => setFile(null)}
+                    aria-label="Remove file"
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-white hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             ) : (
-              <div>
-                <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 mb-4">
-                  <Upload className="h-6 w-6 text-indigo-600" />
+              <>
+                <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-card text-primary shadow-[0_8px_18px_rgba(70,109,165,0.13)]">
+                  <UploadCloud className="h-6 w-6" />
                 </div>
-                <p className="text-gray-700 mb-2">
-                  <span className="font-medium">Click to upload</span> or drag and drop
-                </p>
-                <p className="text-sm text-gray-500 mb-4">PDF (up to 10MB)</p>
-                <button
-                  onClick={handleBrowseClick}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
+                <p className="text-sm font-bold">Drag a PDF here</p>
+                <p className="mt-1 text-[13px] text-muted-foreground">or</p>
+                <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => inputRef.current?.click()}>
                   Browse files
-                </button>
+                </Button>
+                <p className="mt-4 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                  PDF · up to {MAX_MB} MB
+                </p>
+              </>
+            )}
+
+            {isUploading && (
+              <div className="absolute inset-x-0 bottom-0 h-1 overflow-hidden bg-[#dbe8f9]">
+                <div className="h-full w-1/3 animate-[upload-slide_1.2s_ease-in-out_infinite] rounded-full bg-primary" />
               </div>
             )}
           </div>
-          
+
+          {team && (
+            <label className="mt-4 flex cursor-pointer items-center gap-2.5 text-[13px] font-bold">
+              <input
+                type="checkbox"
+                checked={shared}
+                onChange={(e) => setShared(e.target.checked)}
+                className="h-4 w-4 rounded border-input accent-[hsl(var(--primary))]"
+              />
+              Share with {team.name}
+            </label>
+          )}
+
           {error && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-start">
-              <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-600">{error}</p>
+            <div
+              role="alert"
+              className="mt-4 flex items-start gap-2.5 rounded-[9px] border border-destructive/25 bg-destructive/5 px-3.5 py-3 text-[13px] font-semibold text-destructive"
+            >
+              <AlertCircle className="mt-px h-4 w-4 shrink-0" />
+              <span>{error}</span>
             </div>
           )}
-        </div>
-        
-        <div className="flex justify-end p-4 border-t border-gray-200 bg-gray-50 rounded-b-lg">
-          <button
-            onClick={onClose}
-            className="mr-3 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleUpload}
-            disabled={!file || isUploading}
-            className={`px-4 py-2 text-sm font-medium text-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
-              !file || isUploading 
-                ? 'bg-indigo-400 cursor-not-allowed' 
-                : 'bg-indigo-600 hover:bg-indigo-700'
-            }`}
-          >
-            {isUploading ? 'Uploading...' : 'Upload'}
-          </button>
+
+          <div className="mt-5 flex items-center justify-between gap-3 border-t pt-4">
+            <p className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+              <CheckCircle2 className={cn('h-3.5 w-3.5', enough ? 'text-success' : 'text-destructive')} />
+              {UPLOAD_COST} credits to file &amp; index
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={onClose} disabled={isUploading}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpload} disabled={!file || isUploading}>
+                {isUploading ? (
+                  <>
+                    <Loader2 className="animate-spin" /> Filing…
+                  </>
+                ) : (
+                  'Upload'
+                )}
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

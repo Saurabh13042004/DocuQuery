@@ -1,9 +1,26 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { DocumentType } from '../types';
-import { fetchDocuments, DocumentResponse } from '../services/api';
+import { fetchDocuments, deleteDocument as deleteDocumentApi, DocumentResponse } from '../services/api';
+
+// Starring is a client-side preference; remember it across reloads.
+const STAR_KEY = 'docuquery:starred';
+const readStarred = (): Set<string> => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(STAR_KEY) || '[]'));
+  } catch {
+    return new Set();
+  }
+};
+const writeStarred = (ids: Set<string>) => {
+  try {
+    localStorage.setItem(STAR_KEY, JSON.stringify([...ids]));
+  } catch {
+    /* storage unavailable — starring just won't persist */
+  }
+};
 
 // Convert backend document format to frontend format
-const mapDocumentResponse = (doc: DocumentResponse): DocumentType => {
+const mapDocumentResponse = (doc: DocumentResponse, starred: Set<string>): DocumentType => {
   return {
     id: doc.id.toString(),
     name: doc.filename,
@@ -11,7 +28,7 @@ const mapDocumentResponse = (doc: DocumentResponse): DocumentType => {
     createdAt: new Date(doc.upload_date).toLocaleDateString(),
     updatedAt: new Date(doc.upload_date).toLocaleDateString(),
     pageCount: 1, // Default page count
-    starred: false,
+    starred: starred.has(doc.id.toString()),
     folder: 'Uploads',
     messages: doc.messages?.map(msg => ({
       id: msg.id.toString(),
@@ -20,7 +37,9 @@ const mapDocumentResponse = (doc: DocumentResponse): DocumentType => {
       isUser: msg.is_user,
       sourcePdf: doc.filename
     })) || [],
-    filePath: doc.file_path // Store the file path for retrieval
+    filePath: doc.file_path, // Store the file path for retrieval
+    uploadedAt: doc.upload_date,
+    shared: doc.team_id != null,
   };
 };
 
@@ -29,7 +48,8 @@ interface PdfContextType {
   addDocument: (document: DocumentType) => void;
   getDocumentById: (id: string) => DocumentType | undefined;
   updateDocument: (id: string, document: Partial<DocumentType>) => void;
-  deleteDocument: (id: string) => void;
+  /** Deletes on the server, then removes it locally. Resolves false if the server refused. */
+  deleteDocument: (id: string) => Promise<boolean>;
   fetchUserDocuments: () => Promise<void>;
   isLoading: boolean;
 }
@@ -44,7 +64,8 @@ export const PdfProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       setIsLoading(true);
       const docs = await fetchDocuments();
-      setDocuments(docs.map(mapDocumentResponse));
+      const starred = readStarred();
+      setDocuments(docs.map((d) => mapDocumentResponse(d, starred)));
     } catch (error) {
       console.error('Failed to fetch documents:', error);
     } finally {
@@ -66,13 +87,28 @@ export const PdfProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   
   const updateDocument = (id: string, updatedFields: Partial<DocumentType>) => {
-    setDocuments(documents.map(doc => 
+    if (updatedFields.starred !== undefined) {
+      const starred = readStarred();
+      if (updatedFields.starred) starred.add(id);
+      else starred.delete(id);
+      writeStarred(starred);
+    }
+    setDocuments(prev => prev.map(doc =>
       doc.id === id ? { ...doc, ...updatedFields } : doc
     ));
   };
-  
-  const deleteDocument = (id: string) => {
-    setDocuments(documents.filter(doc => doc.id !== id));
+
+  const deleteDocument = async (id: string): Promise<boolean> => {
+    try {
+      await deleteDocumentApi(Number(id));
+    } catch (error) {
+      console.error('Failed to delete document:', error);
+      return false;
+    }
+    const starred = readStarred();
+    if (starred.delete(id)) writeStarred(starred);
+    setDocuments(prev => prev.filter(doc => doc.id !== id));
+    return true;
   };
   
   return (

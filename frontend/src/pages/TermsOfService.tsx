@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FileText, ArrowLeft, Scale, Shield, AlertTriangle, CheckCircle } from 'lucide-react';
+import { FileText, ArrowLeft, Scale, AlertTriangle, CheckCircle } from 'lucide-react';
 import Footer from '../components/Footer';
 
 const TermsOfService: React.FC = () => {

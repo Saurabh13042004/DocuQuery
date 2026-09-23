@@ -1,4 +1,7 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { Hourglass } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { EmptyState, PageContainer, PageHeader } from './components/app/ui';
 import Layout from './components/Layout';
 import ScrollToTop from './components/ScrollToTop';
 import Dashboard from './pages/Dashboard';
@@ -6,6 +9,8 @@ import ChatView from './pages/ChatView';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import RecentPage from './pages/RecentPage';
 import StarredPage from './pages/StarredPage';
 import IntegrationsPage from './pages/IntegrationsPage';
@@ -23,64 +28,23 @@ import { SearchProvider } from './context/SearchContext';
 import ProtectedRoute from './ProtectedRoute';
 import ProfilePage from './pages/ProfilePage';
 import PlansPage from './pages/PlansPage';
+import TeamPage from './pages/TeamPage';
 
-// Placeholder pages for routes that aren't fully implemented yet
-
-const FoldersPage = () => (
-  <div className="p-8">
-    <h1 className="text-2xl font-bold mb-4">Folders</h1>
-    <p className="text-muted-foreground">Organize your documents into folders.</p>
-  </div>
-);
-
-const ToolsPage = () => (
-  <div className="p-8">
-    <h1 className="text-2xl font-bold mb-4">Tools</h1>
-    <p className="text-muted-foreground">Document conversion and automation tools.</p>
-  </div>
-);
-
-const ChatHistoryPage = () => (
-  <div className="p-8">
-    <h1 className="text-2xl font-bold mb-4">Chat History</h1>
-    <p className="text-muted-foreground">View your conversation history with all documents.</p>
-  </div>
-);
-
-const TrashPage = () => (
-  <div className="p-8">
-    <h1 className="text-2xl font-bold mb-4">Trash</h1>
-    <p className="text-muted-foreground">Documents moved to trash appear here. They will be permanently deleted after 30 days.</p>
-  </div>
-);
-
-const SettingsPage = () => (
-  <div className="p-8">
-    <h1 className="text-2xl font-bold mb-4">Settings</h1>
-    <div className="bg-card p-6 rounded-lg shadow-sm border border-border">
-      <h2 className="text-lg font-medium mb-4">Application Settings</h2>
-      <div className="space-y-4">
-        <div>
-          <label className="flex items-center space-x-2">
-            <input type="checkbox" className="h-4 w-4 rounded text-primary" />
-            <span className="text-sm text-foreground">Enable dark mode</span>
-          </label>
-        </div>
-        <div>
-          <label className="flex items-center space-x-2">
-            <input type="checkbox" className="h-4 w-4 rounded text-primary" defaultChecked />
-            <span className="text-sm text-foreground">Show document previews</span>
-          </label>
-        </div>
-        <div>
-          <label className="flex items-center space-x-2">
-            <input type="checkbox" className="h-4 w-4 rounded text-primary" defaultChecked />
-            <span className="text-sm text-foreground">Send email notifications</span>
-          </label>
-        </div>
-      </div>
-    </div>
-  </div>
+// Routes that exist for old links but have no feature behind them yet.
+const ComingSoon = ({ title }: { title: string }) => (
+  <PageContainer>
+    <PageHeader kicker="On the index" title={title} />
+    <EmptyState
+      icon={<Hourglass className="h-6 w-6" />}
+      title="Not filed yet"
+      description={`${title} is on the roadmap. Understand and Edit are live today.`}
+      action={
+        <Button asChild>
+          <Link to="/app">Back to dashboard</Link>
+        </Button>
+      }
+    />
+  </PageContainer>
 );
 
 function App() {
@@ -92,7 +56,9 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/profile" element={<Navigate to="/app/profile" replace />} />
           
           {/* Company Pages */}
           <Route path="/about" element={<About />} />
@@ -118,14 +84,15 @@ function App() {
             <Route path="recent" element={<RecentPage />} />
             <Route path="starred" element={<StarredPage />} />
             <Route path="integrations" element={<IntegrationsPage />} />
-            <Route path="folders" element={<FoldersPage />} />
+            <Route path="folders" element={<ComingSoon title="Folders" />} />
             <Route path="chat/:id" element={<ChatView />} />
             <Route path="profile" element={<ProfilePage />} />
-            <Route path="chat-history" element={<ChatHistoryPage />} />
-            <Route path="tools" element={<ToolsPage />} />
-            <Route path="trash" element={<TrashPage />} />
-            <Route path="settings" element={<SettingsPage />} />
+            <Route path="chat-history" element={<ComingSoon title="Chat history" />} />
+            <Route path="tools" element={<ComingSoon title="Tools" />} />
+            <Route path="trash" element={<ComingSoon title="Trash" />} />
+            <Route path="settings" element={<Navigate to="/app/profile" replace />} />
             <Route path="plans" element={<PlansPage />} />
+            <Route path="team" element={<TeamPage />} />
           </Route>
         </Routes>
       </AuthProvider>

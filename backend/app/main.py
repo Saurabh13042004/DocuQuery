@@ -1,10 +1,9 @@
 from fastapi import FastAPI
 from app.api.routes import router
+from app.api.teams import router as teams_router
 from app.database import engine, Base
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
-import os
 
 app = FastAPI()
 
@@ -15,9 +14,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-os.makedirs("pdfs", exist_ok=True)
-app.mount("/pdfs", StaticFiles(directory="pdfs"), name="pdfs")
 
 
 @app.on_event("startup")
@@ -30,6 +26,7 @@ async def startup():
         for stmt in [
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS credits INTEGER NOT NULL DEFAULT 20",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS plan VARCHAR NOT NULL DEFAULT 'free'",
+            "ALTER TABLE documents ADD COLUMN IF NOT EXISTS team_id INTEGER REFERENCES teams(id)",
         ]:
             try:
                 conn.execute(text(stmt))
@@ -44,3 +41,4 @@ async def shutdown():
 
 
 app.include_router(router)
+app.include_router(teams_router)

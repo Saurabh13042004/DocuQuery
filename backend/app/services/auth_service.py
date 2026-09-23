@@ -1,3 +1,4 @@
+import hashlib
 import os
 import bcrypt
 import jwt
@@ -28,6 +29,49 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 
 def decode_token(token: str) -> dict:
     return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
+
+RESET_TOKEN_EXPIRE_MINUTES = 30
+MIN_PASSWORD_LENGTH = 8
+
+
+def _password_fingerprint(hashed_password: str) -> str:
+    # Ties a reset token to the password it was issued against, so it stops
+    # working once the password changes (single use) without needing a DB table.
+    return hashlib.sha256(hashed_password.encode("utf-8")).hexdigest()[:16]
+
+
+def create_reset_token(user: models.User) -> str:
+    # Deliberately has no "sub" claim: get_current_user requires one, so a reset
+    # token can never be replayed as a login bearer token.
+    payload = {
+        "purpose": "password-reset",
+        "email": user.email,
+        "fp": _password_fingerprint(user.hashed_password),
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES),
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def reset_password(db: Session, token: str, new_password: str) -> models.User:
+    invalid = HTTPException(status_code=400, detail="This reset link is invalid or has expired.")
+    try:
+        payload = decode_token(token)
+    except jwt.PyJWTError:
+        raise invalid
+    if payload.get("purpose") != "password-reset":
+        raise invalid
+
+    user = get_user_by_email(db, payload.get("email", ""))
+    if not user or payload.get("fp") != _password_fingerprint(user.hashed_password):
+        raise invalid
+    if len(new_password) < MIN_PASSWORD_LENGTH:
+        raise HTTPException(status_code=422, detail=f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
+
+    user.hashed_password = hash_password(new_password)
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 def get_user_by_email(db: Session, email: str) -> models.User | None:

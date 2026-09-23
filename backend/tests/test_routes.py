@@ -18,26 +18,21 @@ def make_pdf_bytes() -> bytes:
     return buf.getvalue()
 
 
-def gemini_answer_response(text: str):
-    """Build a mock Gemini response that calls the answer_question tool."""
-    fc = MagicMock()
-    fc.name = "answer_question"
-    fc.args = {"response": text}
-    resp = MagicMock()
-    resp.function_calls = [fc]
-    resp.text = None
-    return resp
+def openai_tool_response(name: str, args: dict):
+    """Build a mock OpenAI chat completion that calls the given tool."""
+    tc = MagicMock()
+    tc.function.name = name
+    tc.function.arguments = json.dumps(args)
+    message = MagicMock(tool_calls=[tc], content=None)
+    return MagicMock(choices=[MagicMock(message=message)])
 
 
-def gemini_edit_response(original: str, new: str):
-    """Build a mock Gemini response that calls the edit_pdf tool."""
-    fc = MagicMock()
-    fc.name = "edit_pdf"
-    fc.args = {"original_text": original, "new_text": new}
-    resp = MagicMock()
-    resp.function_calls = [fc]
-    resp.text = None
-    return resp
+def openai_answer_response(text: str):
+    return openai_tool_response("answer_question", {"response": text})
+
+
+def openai_edit_response(original: str, new: str):
+    return openai_tool_response("edit_pdf", {"original_text": original, "new_text": new})
 
 
 # ── auth routes ───────────────────────────────────────────────────────────────
@@ -243,11 +238,11 @@ class TestAskQuestion:
 
         with patch("app.services.pdf_service.extract_text_from_pdf", new_callable=AsyncMock) as mock_extract, \
              patch("app.services.vector_service.query_relevant_chunks", new_callable=AsyncMock) as mock_rag, \
-             patch("app.services.pdf_service._client") as mock_gemini:
+             patch("app.services.pdf_service._client") as mock_openai:
 
             mock_extract.return_value = "Document with key content."
             mock_rag.return_value = "Key content found here."
-            mock_gemini.models.generate_content.return_value = gemini_answer_response("The answer is 42.")
+            mock_openai.chat.completions.create.return_value = openai_answer_response("The answer is 42.")
 
             resp = client.post("/ask", headers=auth_headers, json={
                 "question": "What is the answer?",
@@ -294,12 +289,12 @@ class TestAskQuestion:
 
         with patch("app.services.pdf_service.extract_text_from_pdf", new_callable=AsyncMock) as mock_extract, \
              patch("app.services.vector_service.query_relevant_chunks", new_callable=AsyncMock) as mock_rag, \
-             patch("app.services.pdf_service._client") as mock_gemini, \
+             patch("app.services.pdf_service._client") as mock_openai, \
              patch("app.services.pdf_service.os.makedirs"):
 
             mock_extract.return_value = "Name: Saurabh Shukla"
             mock_rag.return_value = "Name: Saurabh Shukla"
-            mock_gemini.models.generate_content.return_value = gemini_edit_response("Saurabh", "Rishabh")
+            mock_openai.chat.completions.create.return_value = openai_edit_response("Saurabh", "Rishabh")
 
             resp = client.post("/ask", headers=auth_headers, json={
                 "question": "Change Saurabh to Rishabh",

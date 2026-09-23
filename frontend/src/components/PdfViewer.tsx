@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
 import { DocumentType } from '../types';
+import { fetchDocumentFile } from '../services/api';
 import { Document, Page, pdfjs } from 'react-pdf';
 
 // Initialize PDF.js worker
@@ -17,6 +18,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ document, customPdfUrl }) => {
   const [numPages, setNumPages] = useState(document.pageCount || 1);
   const [pdfUrl, setPdfUrl] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
   const [fitToWidth, setFitToWidth] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -53,25 +55,28 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ document, customPdfUrl }) => {
     }
   }, [containerWidth, zoom, fitToWidth]);
 
+  // Files are private, so download them with the auth header and show the local copy.
   useEffect(() => {
-    if (customPdfUrl) {
-      const baseUrl = 'http://127.0.0.1:8000';
-      const url = customPdfUrl.startsWith('http') 
-        ? customPdfUrl 
-        : `${baseUrl}${customPdfUrl}`;
-      
-      setPdfUrl(url);
-      setCurrentPage(1);
-    }
-    else if (document.filePath) {
-      const baseUrl = 'http://127.0.0.1:8000';
-      const url = document.filePath.startsWith('http')
-        ? document.filePath
-        : `${baseUrl}/pdfs/${document.filePath.split('/').pop()}`;
-
-      setPdfUrl(url);
-    }
-  }, [document, customPdfUrl]);
+    let objectUrl = '';
+    let cancelled = false;
+    setLoadFailed(false);
+    fetchDocumentFile(customPdfUrl ?? `/documents/${document.id}/file`)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPdfUrl(objectUrl);
+        if (customPdfUrl) setCurrentPage(1);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLoadFailed(true);
+        setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [document.id, customPdfUrl]);
 
   const handlePrevPage = () => {
     if (currentPage > 1) {
@@ -188,7 +193,11 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ document, customPdfUrl }) => {
             </div>
           )}
 
-          {pdfUrl && (
+          {loadFailed && (
+            <p className="py-8 text-sm text-destructive">Couldn't load this PDF. Please try again.</p>
+          )}
+
+          {pdfUrl && !loadFailed && (
             <div className="w-full max-w-full flex justify-center px-2">
               <Document
                 file={pdfUrl}
