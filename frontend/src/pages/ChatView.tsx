@@ -1,25 +1,28 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Download, Share2, Maximize, X, ChevronDown, Edit, Bookmark, FileDown, MessageCircle } from 'lucide-react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import {
+  ArrowLeft, ArrowUp, Download, FileDown, FileText, Maximize2, MessageCircle, MessageSquare, PanelLeftClose,
+  PanelLeftOpen, Sparkles, X,
+} from 'lucide-react';
 import { usePdf } from '../context/PdfContext';
 import { useAuth } from '../context/AuthContext';
 import ChatMessage from '../components/ChatMessage';
 import PdfViewer from '../components/PdfViewer';
 import CommentsPanel from '../components/CommentsPanel';
-import { askQuestion, saveMessage, fetchDocumentMessages, exportChat, getTeamPrompts } from '../services/api';
+import { EmptyState } from '../components/app/ui';
+import { useMediaQuery } from '../hooks/useMediaQuery';
+import { askQuestion, saveMessage, fetchDocumentMessages, fetchDocumentFile, exportChat, getTeamPrompts } from '../services/api';
 import { MessageType, TeamPrompt } from '../types';
 import { Button } from '@/components/ui/button';
-
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
+import { cn } from '@/lib/utils';
 import '../styles/scroll.css';
-import '../styles/chat-responsive.css';
 
 const PROMPT_TEMPLATES = [
   { label: 'Summarize', prompt: 'Summarize this document in 5 bullet points' },
@@ -39,6 +42,8 @@ const ChatView: React.FC = () => {
 
   const [message, setMessage] = useState('');
   const [showPdfViewer, setShowPdfViewer] = useState(true);
+  const [mobilePane, setMobilePane] = useState<'chat' | 'doc'>('chat');
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
   const [fullScreenPdf, setFullScreenPdf] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<MessageType[]>(document?.messages || []);
@@ -139,6 +144,7 @@ const ChatView: React.FC = () => {
         setCurrentPdfUrl(response.editedPdfUrl);
         // Make sure PDF viewer is visible
         setShowPdfViewer(true);
+        setMobilePane('doc');
       }
       
       // Save AI message to backend
@@ -154,12 +160,13 @@ const ChatView: React.FC = () => {
       // Refresh sidebar credit counter after every AI operation
       refreshUser().catch(() => {});
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error getting answer:', error);
 
       // 402 = insufficient credits
-      const is402 = error?.response?.status === 402;
-      const detail = error?.response?.data?.detail;
+      const res = axios.isAxiosError(error) ? error.response : undefined;
+      const is402 = res?.status === 402;
+      const detail = res?.data?.detail;
       const errorText = is402
         ? `Not enough credits. ${typeof detail === 'object' ? detail.message : detail} Go to Plans to top up.`
         : "Sorry, I couldn't process your question. Please try again.";
@@ -194,6 +201,7 @@ const ChatView: React.FC = () => {
   const handleViewEditedPdf = (url: string) => {
     setCurrentPdfUrl(url);
     setShowPdfViewer(true);
+    setMobilePane('doc');
   };
 
   const handleExport = async () => {
@@ -208,27 +216,23 @@ const ChatView: React.FC = () => {
     }
   };
   
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
     if (!document) return;
-    
-    // Get the current PDF URL (either edited or original)
-    const pdfToDownload = currentPdfUrl || document.filePath;
-    
-    // Create the full URL
-    const baseUrl = 'http://127.0.0.1:8000';
-    const downloadUrl = pdfToDownload?.startsWith('http') 
-      ? pdfToDownload 
-      : `${baseUrl}${pdfToDownload}`;
-    
-    // Create a temporary anchor element and trigger download
-    const a = window.document.createElement('a');
-    a.href = downloadUrl;
-    a.download = currentPdfUrl 
-      ? `edited_${document.name}` 
-      : document.name;
-    window.document.body.appendChild(a);
-    a.click();
-    window.document.body.removeChild(a);
+
+    try {
+      // Files are private: fetch the current version (edited or original) with auth, then save it
+      const blob = await fetchDocumentFile(currentPdfUrl || `/documents/${document.id}/file`);
+      const url = URL.createObjectURL(blob);
+      const a = window.document.createElement('a');
+      a.href = url;
+      a.download = currentPdfUrl ? `edited_${document.name}` : document.name;
+      window.document.body.appendChild(a);
+      a.click();
+      window.document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Download failed', e);
+    }
   };
   
   // Sync messages with document
@@ -240,7 +244,8 @@ const ChatView: React.FC = () => {
   
   // Auto-scroll to bottom when messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Nothing to follow in the empty state; scrolling would push its heading out of view.
+    if (messages.length > 0) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
   
   // Focus input on mount
@@ -252,431 +257,298 @@ const ChatView: React.FC = () => {
   
   if (!document) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Card className="w-full max-w-sm mx-4">
-          <CardContent className="pt-6 text-center">
-            <div className="p-3 bg-muted rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4">
-              <svg className="h-6 w-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <h3 className="font-semibold text-foreground mb-2">Document Not Found</h3>
-            <p className="text-sm text-muted-foreground">The requested document could not be located.</p>
-          </CardContent>
-        </Card>
+      <div className="grid h-full place-items-center p-6">
+        <EmptyState
+          icon={<FileText className="h-6 w-6" />}
+          title="Document not found"
+          description="It may have been deleted, or it belongs to another account."
+          action={
+            <Button asChild>
+              <Link to="/app">Back to dashboard</Link>
+            </Button>
+          }
+          className="w-full max-w-md"
+        />
       </div>
     );
   }
-  
-  return (
-    <div className="h-screen bg-background overflow-hidden chat-container">
-      {showPdfViewer && !fullScreenPdf ? (
-        <ResizablePanelGroup direction="horizontal" className="h-full layout-transition">
-          {/* PDF Viewer Panel */}
-          <ResizablePanel defaultSize={45} minSize={30} maxSize={70} className="pdf-panel">
-            <div className="bg-background border-r flex flex-col h-full">
-              {/* PDF Header */}
-              <div className="p-4 border-b bg-background shrink-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <svg className="h-4 w-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h2 className="font-semibold text-foreground text-sm">
-                        {currentPdfUrl ? `Edited: ${document.name}` : document.name}
-                      </h2>
-                      <p className="text-xs text-muted-foreground">
-                        {document.pageCount} pages • PDF Document
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setFullScreenPdf(!fullScreenPdf)}
-                      className="h-8 w-8 p-0 btn-hover focus-ring"
-                    >
-                      <Maximize className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowPdfViewer(false)}
-                      className="h-8 w-8 p-0 btn-hover focus-ring"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              
-              {/* PDF Content */}
-              <div className="flex-1 bg-muted/30 overflow-hidden">
-                <ScrollArea className="h-full custom-scrollbar">
-                  <PdfViewer document={document} customPdfUrl={currentPdfUrl} />
-                </ScrollArea>
-              </div>
-              
-              {/* PDF Actions */}
-              <div className="p-3 border-t bg-background shrink-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={handleDownloadPdf}
-                      className="h-8 w-8 p-0"
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <Share2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    Page 1 of {document.pageCount}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </ResizablePanel>
-          
-          <ResizableHandle withHandle className="resizable-handle" />
-          
-          {/* Chat Panel */}
-          <ResizablePanel defaultSize={55} minSize={30} className="chat-panel">
-            <div className="flex flex-col h-full">
-            {/* Chat Header */}
-            <header className="bg-background border-b p-4 shrink-0">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <svg className="h-4 w-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h1 className="font-semibold text-foreground text-sm">
-                        Document Chat
-                      </h1>
-                      <p className="text-xs text-muted-foreground">
-                        {document.name}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowComments((v) => !v)}
-                    className="h-8 px-2 text-xs gap-1 text-muted-foreground"
-                    title="Comments"
-                  >
-                    <MessageCircle className="h-3.5 w-3.5" />
-                    Comments{openComments > 0 && ` (${openComments})`}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleExport}
-                    disabled={isExporting || messages.length === 0}
-                    className="h-8 px-2 text-xs gap-1 text-muted-foreground"
-                    title="Export chat as Markdown"
-                  >
-                    <FileDown className="h-3.5 w-3.5" />
-                    {isExporting ? 'Exporting…' : 'Export'}
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <Bookmark className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </header>
 
-          {showComments && <CommentsPanel documentId={parseInt(document.id)} onCount={setOpenComments} />}
+  const displayName = document.name.replace(/\.pdf$/i, '');
+  const suggestions = [...PROMPT_TEMPLATES, ...teamPrompts.map((p) => ({ label: p.title, prompt: p.prompt }))];
 
-          {/* Chat Messages */}
-          <div className="flex-1 bg-muted/10 overflow-hidden">
-            <ScrollArea className="h-full custom-scrollbar message-container">
-              <div className="p-6">
-                <div className="max-w-4xl mx-auto space-y-6">
-                {messages && messages.length > 0 ? (
-                  messages.map((msg, index) => (
-                    <ChatMessage 
-                      key={index} 
-                      message={msg} 
-                      onViewEditedPdf={handleViewEditedPdf}
-                    />
-                  ))
-                ) : (
-                  <div className="flex items-center justify-center min-h-[50vh]">
-                    <Card className="w-full max-w-md border-dashed">
-                  <CardContent className="pt-6">
-                    <div className="text-center">
-                      <div className="p-3 bg-primary/10 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4">
-                        <Send className="h-6 w-6 text-primary" />
-                      </div>
-                      <h3 className="font-semibold text-foreground mb-2">
-                        Start your conversation
-                      </h3>
-                      <p className="text-sm text-muted-foreground mb-6">
-                        Ask questions and get intelligent answers from your document.
-                      </p>
-                      <div className="grid gap-2">
-                        {['What is this document about?', 'Summarize the key points', 'Find information about...', 'Explain the concept of...'].map((suggestion, index) => (
-                          <Button
-                            key={index}
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setMessage(suggestion)}
-                            className="justify-start text-xs h-auto py-2"
-                          >
-                            {suggestion}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                    </CardContent>
-                  </Card>
-                  </div>
-                )}
-                
-                {isLoading && (
-                  <Card className="bg-background shadow-sm max-w-xs">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex gap-1">
-                          <div className="w-2 h-2 bg-primary rounded-full bounce-smooth"></div>
-                          <div className="w-2 h-2 bg-primary rounded-full bounce-smooth" style={{ animationDelay: '0.2s' }}></div>
-                          <div className="w-2 h-2 bg-primary rounded-full bounce-smooth" style={{ animationDelay: '0.4s' }}></div>
-                        </div>
-                        <span className="text-sm text-muted-foreground">DocuQuery is analyzing...</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-                
-                <div ref={messagesEndRef} />
+  /* ---------------- Panes ---------------- */
+
+  const pdfPane = (
+    <div className="flex h-full min-h-0 flex-col bg-card">
+      <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b px-3 sm:px-4">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-accent text-primary">
+            <FileText className="h-4 w-4" />
+          </span>
+          <span className="truncate text-[13px] font-bold">{currentPdfUrl ? `Edited · ${displayName}` : displayName}</span>
+          {currentPdfUrl && (
+            <span className="hidden shrink-0 rounded-full bg-success/15 px-2 py-0.5 font-mono text-[10px] text-[#1f7a5a] sm:inline">
+              EDITED
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-0.5">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleDownloadPdf} aria-label="Download PDF">
+            <Download className="h-4 w-4" />
+          </Button>
+          {isDesktop && (
+            <>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setFullScreenPdf(true)} aria-label="Full screen">
+                <Maximize2 className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowPdfViewer(false)} aria-label="Hide document">
+                <X className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 bg-[#eef3fa]">
+        <ScrollArea className="custom-scrollbar h-full">
+          <PdfViewer document={document} customPdfUrl={currentPdfUrl} />
+        </ScrollArea>
+      </div>
+    </div>
+  );
+
+  const chatPane = (
+    <div className="flex h-full min-h-0 flex-col bg-background">
+      {showComments && <CommentsPanel documentId={parseInt(document.id)} onCount={setOpenComments} />}
+
+      <div className="min-h-0 flex-1">
+        <ScrollArea className="custom-scrollbar h-full">
+          <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-6 sm:px-6">
+            {messages && messages.length > 0 ? (
+              messages.map((msg, index) => (
+                <ChatMessage key={msg.id ?? index} message={msg} onViewEditedPdf={handleViewEditedPdf} />
+              ))
+            ) : (
+              <div className="flex min-h-[46vh] flex-col items-center justify-center text-center animate-rise">
+                <div className="mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-accent text-primary">
+                  <Sparkles className="h-6 w-6" />
                 </div>
-              </div>
-            </ScrollArea>
-          </div>
-          
-          {/* Chat Input */}
-          <div className="bg-background border-t p-4 shrink-0">
-            <div className="max-w-4xl mx-auto">
-              {/* Prompt template chips */}
-              {messages.length === 0 && (
-                <div className="flex gap-1.5 flex-wrap mb-3">
-                  {[...PROMPT_TEMPLATES, ...teamPrompts.map((p) => ({ label: p.title, prompt: p.prompt }))].map((t) => (
+                <h2 className="text-2xl font-extrabold tracking-[-0.05em]">Ask this document anything.</h2>
+                <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
+                  Get answers stamped to the exact page, or tell it what to change — like “change the name from John to
+                  Adam”.
+                </p>
+                <div className="mt-7 grid w-full max-w-xl grid-cols-2 gap-2">
+                  {suggestions.map((t) => (
                     <button
                       key={t.label}
-                      onClick={() => setMessage(t.prompt)}
-                      className="px-2.5 py-1 rounded-full border border-border text-xs text-muted-foreground hover:border-primary hover:text-primary transition-colors bg-background"
+                      type="button"
+                      onClick={() => {
+                        setMessage(t.prompt);
+                        inputRef.current?.focus();
+                      }}
+                      className="group rounded-xl border bg-card px-4 py-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[0_10px_30px_rgba(49,93,151,0.08)]"
                     >
-                      {t.label}
+                      <span className="block text-[13px] font-bold group-hover:text-primary">{t.label}</span>
+                      <span className="mt-0.5 line-clamp-1 hidden text-xs text-muted-foreground sm:block">{t.prompt}</span>
                     </button>
                   ))}
                 </div>
-              )}
-              <div className="relative">
-                <Input
-                  ref={inputRef}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Ask a question about this document..."
-                  className="pr-12 h-12"
-                  disabled={isLoading}
-                />
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={isLoading || message.trim() === ''}
-                  size="sm"
-                  className="absolute right-2 top-2 h-8 w-8 p-0 btn-hover focus-ring"
+              </div>
+            )}
+
+            {isLoading && (
+              <div className="flex animate-rise gap-3" role="status" aria-live="polite">
+                <span className="mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary text-[13px] font-extrabold text-primary-foreground">
+                  D
+                </span>
+                <div className="flex items-center gap-3 rounded-2xl rounded-tl-md border bg-card px-4 py-3">
+                  <span className="flex gap-1" aria-hidden>
+                    {[0, 1, 2].map((i) => (
+                      <span
+                        key={i}
+                        className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary"
+                        style={{ animationDelay: `${i * 0.15}s` }}
+                      />
+                    ))}
+                  </span>
+                  <span className="font-mono text-[11px] text-muted-foreground">Reading the document…</span>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        </ScrollArea>
+      </div>
+
+      {/* Composer */}
+      <div className="shrink-0 border-t bg-card/90 px-4 pb-3 pt-3 backdrop-blur sm:px-6">
+        <div className="mx-auto max-w-3xl">
+          {messages.length > 0 && (
+            <div className="-mx-1 mb-2.5 flex gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {suggestions.slice(0, 4).map((t) => (
+                <button
+                  key={t.label}
+                  type="button"
+                  onClick={() => {
+                    setMessage(t.prompt);
+                    inputRef.current?.focus();
+                  }}
+                  className="shrink-0 rounded-full border bg-card px-3 py-1 text-xs font-bold text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
                 >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground text-center">
-                DocuQuery may produce inaccurate information about people, places, or facts.
-              </p>
+                  {t.label}
+                </button>
+              ))}
             </div>
+          )}
+          <div className="relative">
+            <input
+              ref={inputRef}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask a question, or tell it what to change…"
+              aria-label="Message"
+              disabled={isLoading}
+              className="h-12 w-full rounded-xl border border-input bg-card pl-4 pr-14 text-base transition-all placeholder:text-muted-foreground/70 hover:border-primary/40 focus-visible:border-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/10 disabled:opacity-60 sm:text-sm"
+            />
+            <button
+              type="button"
+              onClick={handleSendMessage}
+              disabled={isLoading || message.trim() === ''}
+              aria-label="Send message"
+              className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground transition-all hover:bg-[#1d4ed8] active:scale-95 disabled:bg-[#c8dafa] disabled:opacity-100"
+            >
+              <ArrowUp className="h-4 w-4" />
+            </button>
           </div>
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      ) : (
-        !showPdfViewer && (
-          <div className="flex flex-col h-full">
-            {/* Chat Header */}
-            <header className="bg-background border-b p-4 shrink-0">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowPdfViewer(true)}
-                    className="h-8 w-8 p-0"
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <svg className="h-4 w-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h1 className="font-semibold text-foreground text-sm">
-                        Document Chat
-                      </h1>
-                      <p className="text-xs text-muted-foreground">
-                        {document.name}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  <Bookmark className="h-4 w-4" />
-                </Button>
-              </div>
-            </header>
+          <p className="mt-2 text-center font-mono text-[10px] text-muted-foreground">
+            Answers can be wrong — check the cited page before you act on them.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 
-            {/* Chat Messages */}
-            <div className="flex-1 bg-muted/10 overflow-hidden">
-              <ScrollArea className="h-full">
-                <div className="p-6">
-                  <div className="max-w-4xl mx-auto space-y-6">
-                    {messages && messages.length > 0 ? (
-                      messages.map((msg, index) => (
-                        <ChatMessage 
-                          key={index} 
-                          message={msg} 
-                          onViewEditedPdf={handleViewEditedPdf}
-                        />
-                      ))
-                    ) : (
-                      <div className="flex items-center justify-center min-h-[60vh]">
-                        <Card className="w-full max-w-md border-dashed">
-                          <CardContent className="pt-6">
-                            <div className="text-center">
-                              <div className="p-3 bg-primary/10 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-4">
-                                <Send className="h-6 w-6 text-primary" />
-                              </div>
-                              <h3 className="font-semibold text-foreground mb-2">
-                                Start your conversation
-                              </h3>
-                              <p className="text-sm text-muted-foreground mb-6">
-                                Ask questions and get intelligent answers from your document.
-                              </p>
-                              <div className="grid gap-2">
-                                {['What is this document about?', 'Summarize the key points', 'Find information about...', 'Explain the concept of...'].map((suggestion, index) => (
-                                  <Button
-                                    key={index}
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setMessage(suggestion)}
-                                    className="justify-start text-xs h-auto py-2"
-                                  >
-                                    {suggestion}
-                                  </Button>
-                                ))}
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </div>
-                    )}
-                    
-                    {isLoading && (
-                      <Card className="bg-background shadow-sm max-w-xs">
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-3">
-                            <div className="flex gap-1">
-                              <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
-                              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                            </div>
-                            <span className="text-sm text-muted-foreground">DocuQuery is analyzing...</span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                    
-                    <div ref={messagesEndRef} />
-                  </div>
-                </div>
-              </ScrollArea>
-            </div>
+  /* ---------------- Layout ---------------- */
 
-            {/* Chat Input */}
-            <div className="bg-background border-t p-4 shrink-0">
-              <div className="max-w-4xl mx-auto">
-                <div className="relative">
-                  <Input
-                    ref={inputRef}
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Ask a question about this document..."
-                    className="pr-12 h-12"
-                    disabled={isLoading}
-                  />
-                  <Button
-                    onClick={handleSendMessage}
-                    disabled={isLoading || message.trim() === ''}
-                    size="sm"
-                    className="absolute right-2 top-2 h-8 w-8 p-0"
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground text-center">
-                  DocuQuery may produce inaccurate information about people, places, or facts.
-                </p>
-              </div>
-            </div>
-          </div>
-        )
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-background">
+      <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-card px-2 sm:px-4">
+        <Button asChild variant="ghost" size="icon" className="h-9 w-9" aria-label="Back to dashboard">
+          <Link to="/app">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        </Button>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-sm font-bold leading-tight tracking-normal">{displayName}</h1>
+          <p className="kicker truncate">
+            Document chat{messages.length > 0 ? ` · ${messages.length} message${messages.length === 1 ? '' : 's'}` : ''}
+          </p>
+        </div>
+        <div className="flex items-center gap-0.5">
+          {isDesktop && !showPdfViewer && (
+            <Button variant="ghost" size="sm" onClick={() => setShowPdfViewer(true)} className="gap-1.5">
+              <PanelLeftOpen className="h-4 w-4" /> Document
+            </Button>
+          )}
+          {isDesktop && showPdfViewer && (
+            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowPdfViewer(false)} aria-label="Hide document">
+              <PanelLeftClose className="h-4 w-4" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowComments((v) => !v)}
+            aria-pressed={showComments}
+            className={cn('gap-1.5 px-2.5', showComments && 'bg-accent text-primary')}
+          >
+            <MessageCircle className="h-4 w-4" />
+            <span className="hidden sm:inline">Comments</span>
+            {openComments > 0 && (
+              <span className="rounded-full bg-primary px-1.5 font-mono text-[10px] font-medium text-primary-foreground">
+                {openComments}
+              </span>
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleExport}
+            disabled={isExporting || messages.length === 0}
+            className="gap-1.5 px-2.5"
+            aria-label="Export chat as Markdown"
+          >
+            <FileDown className="h-4 w-4" />
+            <span className="hidden sm:inline">{isExporting ? 'Exporting…' : 'Export'}</span>
+          </Button>
+        </div>
+      </header>
+
+      {/* Mobile / tablet: switch between chat and document */}
+      {!isDesktop && (
+        <div role="tablist" aria-label="View" className="flex shrink-0 gap-1 border-b bg-card p-2">
+          {(
+            [
+              ['chat', MessageSquare, 'Chat'],
+              ['doc', FileText, 'Document'],
+            ] as const
+          ).map(([key, Icon, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={mobilePane === key}
+              onClick={() => setMobilePane(key)}
+              className={cn(
+                'flex flex-1 items-center justify-center gap-2 rounded-[9px] py-2 text-[13px] font-bold transition-colors',
+                mobilePane === key ? 'bg-accent text-primary' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              <Icon className="h-4 w-4" /> {label}
+            </button>
+          ))}
+        </div>
       )}
 
-      {/* Fullscreen PDF Overlay */}
+      <div className="min-h-0 flex-1">
+        {isDesktop ? (
+          showPdfViewer ? (
+            <ResizablePanelGroup direction="horizontal" className="h-full">
+              <ResizablePanel defaultSize={45} minSize={28} maxSize={70}>
+                {pdfPane}
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+              <ResizablePanel defaultSize={55} minSize={30}>
+                {chatPane}
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          ) : (
+            chatPane
+          )
+        ) : mobilePane === 'doc' ? (
+          pdfPane
+        ) : (
+          chatPane
+        )}
+      </div>
+
+      {/* Fullscreen PDF overlay */}
       {fullScreenPdf && (
-        <div className="fixed inset-0 bg-background z-50 flex flex-col">
-          <div className="p-4 border-b bg-background flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <svg className="h-4 w-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <h2 className="font-semibold text-foreground">
-                {(document as any)?.name || 'Document'}
-              </h2>
+        <div className="fixed inset-0 z-[70] flex flex-col bg-background" role="dialog" aria-modal="true" aria-label={displayName}>
+          <div className="flex h-14 shrink-0 items-center justify-between border-b bg-card px-4">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="grid h-7 w-7 place-items-center rounded-lg bg-accent text-primary">
+                <FileText className="h-4 w-4" />
+              </span>
+              <h2 className="truncate text-sm font-bold tracking-normal">{displayName}</h2>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setFullScreenPdf(false)}
-              className="h-8 w-8 p-0"
-            >
+            <Button variant="ghost" size="icon" onClick={() => setFullScreenPdf(false)} aria-label="Exit full screen">
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <div className="flex-1 overflow-hidden">
-            <ScrollArea className="h-full custom-scrollbar">
+          <div className="min-h-0 flex-1 bg-[#eef3fa]">
+            <ScrollArea className="custom-scrollbar h-full">
               <PdfViewer document={document} customPdfUrl={currentPdfUrl} />
             </ScrollArea>
           </div>

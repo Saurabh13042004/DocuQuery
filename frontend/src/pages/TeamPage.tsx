@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
+import { PageContainer, PageHeader } from '../components/app/ui';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '../context/AuthContext';
 import {
   getMyTeam, createTeam, inviteMember, acceptInvite, cancelInvite, changeMemberRole, removeMember,
-  getTeamUsage, getTeamPrompts, addTeamPrompt, deleteTeamPrompt,
+  getTeamUsage, getTeamPrompts, addTeamPrompt, deleteTeamPrompt, errorMessage,
 } from '../services/api';
 import { PendingInvite, TeamInfo, TeamRole, MemberUsage, TeamPrompt } from '../types';
 
 const CATEGORIES = ['General', 'HR', 'Legal', 'Finance'];
-const selectClass = 'h-9 rounded-md border border-input bg-background px-2 text-sm';
+const selectClass =
+  'h-10 rounded-[9px] border border-input bg-card px-2.5 text-sm font-bold transition-all hover:border-primary/40 focus-visible:border-primary focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/10';
 
 export default function TeamPage() {
   const { user, refreshUser, refreshTeam } = useAuth();
@@ -55,19 +57,16 @@ export default function TeamPage() {
       await fn();
       after?.();
       await load();
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'Something went wrong. Please try again.');
+    } catch (e) {
+      setError(errorMessage(e, 'Something went wrong. Please try again.'));
     }
   };
 
   if (!loaded) return <div className="p-8 text-muted-foreground">Loading team…</div>;
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-8 overflow-y-auto h-full">
-      <div className="flex items-center gap-3">
-        <Users className="h-6 w-6" />
-        <h1 className="text-3xl font-bold text-foreground">Team</h1>
-      </div>
+    <PageContainer className="max-w-4xl space-y-8">
+      <PageHeader kicker="Collaborate" title="Team" description="Shared documents, roles and usage for your workspace." className="!mb-0" />
 
       {error && (
         <div className="bg-destructive/10 border border-destructive/30 text-destructive rounded-lg p-3 text-sm">{error}</div>
@@ -103,7 +102,7 @@ export default function TeamPage() {
               <p className="text-sm text-muted-foreground">
                 The Team plan gives you a shared document library, roles and a usage dashboard for 5 seats.
               </p>
-              <Link to="/app/plans"><Button>See plans</Button></Link>
+              <Button asChild><Link to="/app/plans">See plans</Link></Button>
             </>
           )}
         </div>
@@ -122,8 +121,8 @@ export default function TeamPage() {
           </div>
 
           {/* Members */}
-          <div className="border border-border rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <table className="w-full min-w-[480px] text-sm">
               <thead className="bg-muted/40 text-muted-foreground">
                 <tr>
                   <th className="text-left px-4 py-3 font-medium">Member</th>
@@ -205,8 +204,8 @@ export default function TeamPage() {
           {canManage && (
             <div>
               <h2 className="text-lg font-semibold mb-3">Usage</h2>
-              <div className="border border-border rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto rounded-xl border border-border bg-card">
+                <table className="w-full min-w-[480px] text-sm">
                   <thead className="bg-muted/40 text-muted-foreground">
                     <tr>
                       <th className="text-left px-4 py-3 font-medium">Member</th>
@@ -274,6 +273,6 @@ export default function TeamPage() {
           </div>
         </>
       )}
-    </div>
+    </PageContainer>
   );
 }

@@ -11,10 +11,15 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Endpoints where a 401 means "wrong credentials", not "your session expired".
+// Redirecting there would reload the page and wipe the error message.
+const AUTH_PATHS = ['/login', '/signup', '/forgot-password', '/reset-password'];
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const url: string = error.config?.url ?? '';
+    if (error.response?.status === 401 && !AUTH_PATHS.some((p) => url.startsWith(p))) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
@@ -33,6 +38,7 @@ export interface User {
   created_at: string;
   credits: number;
   plan: PlanId;
+  avatar?: string;
 }
 
 export interface AuthResponse {
@@ -47,6 +53,7 @@ export interface DocumentResponse {
   file_path: string;
   upload_date: string;
   team_id?: number | null;
+  messages?: MessageResponse[];
 }
 
 export interface MessageResponse {
@@ -86,6 +93,26 @@ export const login = async (email: string, password: string): Promise<AuthRespon
   localStorage.setItem('token', response.data.access_token);
   localStorage.setItem('user', JSON.stringify(response.data.user));
   return response.data;
+};
+
+export const forgotPassword = async (email: string): Promise<string> => {
+  const response = await api.post<{ message: string }>('/forgot-password', { email });
+  return response.data.message;
+};
+
+export const resetPassword = async (token: string, password: string): Promise<string> => {
+  const response = await api.post<{ message: string }>('/reset-password', { token, password });
+  return response.data.message;
+};
+
+/** Pulls a readable message out of an axios error. */
+export const errorMessage = (error: unknown, fallback: string): string => {
+  if (!axios.isAxiosError(error)) return fallback;
+  if (!error.response) return 'Can’t reach the server. Check your connection and try again.';
+  const detail = (error.response.data as { detail?: unknown } | undefined)?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail) && typeof detail[0]?.msg === 'string') return detail[0].msg;
+  return fallback;
 };
 
 export const logout = () => {
@@ -132,6 +159,12 @@ export const uploadPDF = async (file: File, shared = false): Promise<DocumentRes
 
 export const fetchDocuments = async (): Promise<DocumentResponse[]> => {
   const response = await api.get<DocumentResponse[]>('/documents');
+  return response.data;
+};
+
+// PDFs are private: fetch through the API (auth header included) and use the blob locally.
+export const fetchDocumentFile = async (path: string): Promise<Blob> => {
+  const response = await api.get<Blob>(path, { responseType: 'blob' });
   return response.data;
 };
 

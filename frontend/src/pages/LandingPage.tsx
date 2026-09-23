@@ -1,845 +1,978 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  MessageSquare, FileText, Shield, ArrowRight, 
-  Check, Upload, Star, Users, Globe, 
-  Headphones, Mail, Edit3,
-  ChevronDown, ChevronUp, Zap, Lock, Play,
-  Database, Brain, BookOpen
+import {
+  ArrowRight,
+  ArrowUpRight,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  FileText,
+  Menu,
+  Minus,
+  Quote,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  UploadCloud,
+  Wand2,
+  X,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import '../styles/landing.css';
 
-const LandingPage: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [activeFeature, setActiveFeature] = useState(0);
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
+/* ------------------------------------------------------------------ */
+/* Content                                                             */
+/* ------------------------------------------------------------------ */
+
+const NAV_LINKS = [
+  { href: '#features', id: 'features', label: 'Features' },
+  { href: '#method', id: 'method', label: 'Method' },
+  { href: '#membership', id: 'membership', label: 'Membership' },
+  { href: '#index', id: 'index', label: 'Index' },
+];
+
+const FILE_TYPES = [
+  'Rental agreements',
+  'Offer letters',
+  'Loan documents',
+  'Research papers',
+  'Bank statements',
+  'Contracts',
+  'Government notices',
+];
+
+interface DemoDoc {
+  key: string;
+  initials: string;
+  name: string;
+  file: string;
+  pages: number;
+  question: string;
+  answer: React.ReactNode;
+  cite: string;
+  before: string;
+  after: string;
+  seconds: string;
+}
+
+const DEMO_DOCS: DemoDoc[] = [
+  {
+    key: 'rental',
+    initials: 'RA',
+    name: 'Rental agreement',
+    file: 'RENTAL_AGREEMENT.PDF',
+    pages: 4,
+    question: 'What’s the notice period if I want to vacate early?',
+    answer: (
+      <>
+        You need to give <strong>30 days’ written notice</strong> under the termination clause.
+      </>
+    ),
+    cite: 'Page 4 · §9.2',
+    before: 'Dear Jhon Doe,',
+    after: 'Dear John Doe,',
+    seconds: '1.8',
+  },
+  {
+    key: 'loan',
+    initials: 'LS',
+    name: 'Loan sanction',
+    file: 'LOAN_SANCTION.PDF',
+    pages: 8,
+    question: 'What was the total loan amount and the interest rate?',
+    answer: (
+      <>
+        The sanctioned amount is <strong>₹12,00,000</strong> at <strong>8.9% p.a.</strong> reducing balance.
+      </>
+    ),
+    cite: 'Page 2 · §3.1',
+    before: 'Sanctioned on 12 Mar 2026',
+    after: 'Sanctioned on 21 Mar 2026',
+    seconds: '2.1',
+  },
+  {
+    key: 'offer',
+    initials: 'OL',
+    name: 'Offer letter',
+    file: 'OFFER_LETTER.PDF',
+    pages: 3,
+    question: 'What’s my joining date and annual CTC?',
+    answer: (
+      <>
+        You join on <strong>1 April 2026</strong> with an annual CTC of <strong>₹14,50,000</strong>.
+      </>
+    ),
+    cite: 'Page 1 · §2',
+    before: 'Annual CTC: ₹14,00,000',
+    after: 'Annual CTC: ₹14,50,000',
+    seconds: '1.6',
+  },
+];
+
+const STEPS = [
+  {
+    title: 'File it',
+    body: 'Drag in a contract, offer letter, research paper, or scanned notice. It is accessioned and ready to query in seconds.',
+  },
+  {
+    title: 'Query or amend it',
+    body: '“What’s the notice period in clause 9?” or “Change the date to March 3rd.” The registry understands both requests.',
+  },
+  {
+    title: 'Take the card',
+    body: 'A cited answer, stamped to the exact page it came from — or a corrected file, ready to download.',
+  },
+];
+
+const ROADMAP = [
+  { title: 'Understand', live: true, body: 'Chat with any PDF, answers stamped to the exact page.' },
+  { title: 'Edit', live: true, body: 'Fix text in place, in plain English, in a couple of seconds.' },
+  { title: 'Generate', live: false, body: 'Turn a spreadsheet into hundreds of branded PDFs at once.' },
+  { title: 'Extract', live: false, body: 'Pull structured fields out of a batch of PDFs into a table.' },
+];
+
+const COMPARISON = [
+  { tool: 'ChatPDF / PDF.ai', chat: true, edit: false, cited: false, price: '$0–20/mo' },
+  { tool: 'Adobe Acrobat', chat: false, edit: true, cited: false, price: '$20–30/mo' },
+  { tool: 'DocuQuery', chat: true, edit: true, cited: true, price: '$0–29/mo', ours: true },
+];
+
+const PLANS = [
+  {
+    key: 'Free',
+    price: 'Free',
+    per: '',
+    blurb: 'Try it on your next PDF',
+    credits: '20 one-time credits',
+    features: ['PDF Q&A with citations', 'Real-time PDF editing', 'Personal registry', 'Community support'],
+    cta: 'Enroll free',
+  },
+  {
+    key: 'Starter',
+    price: '$9',
+    per: '/ month',
+    blurb: 'For individuals who file weekly',
+    credits: '500 credits / month',
+    features: [
+      'Everything in Free',
+      '500 credits every month',
+      'Export exchanges to Markdown/text',
+      'Email support',
+    ],
+    cta: 'Join Starter',
+    featured: true,
+  },
+  {
+    key: 'Pro',
+    price: '$29',
+    per: '/ month',
+    blurb: 'For power users and growing teams',
+    credits: '2,000 credits / month',
+    features: ['Everything in Starter', '2,000 credits every month', 'API access', 'Priority support'],
+    cta: 'Join Pro',
+  },
+];
+
+const TARIFF = [
+  { label: 'File & index a PDF', cost: '2 cr' },
+  { label: 'Ask a question', cost: '1 cr' },
+  { label: 'Edit a PDF', cost: '2 cr' },
+];
+
+const FAQS = [
+  {
+    q: 'How does the real-time PDF editing actually work?',
+    a: 'Tell DocuQuery what to change — like “change the name from John to Adam” — and it locates the text, edits it in place, and preserves the original font and spacing.',
+  },
+  {
+    q: 'Can I trust the answers, or do I need to double-check everything?',
+    a: 'Every answer includes a source page and section so you can verify the original text in context before acting on it.',
+  },
+  {
+    q: 'What file types are supported?',
+    a: 'DocuQuery is built for PDFs: contracts, statements, papers, notices, letters, and scanned documents.',
+  },
+  {
+    q: 'Is my document data secure?',
+    a: 'Your registry is private by default. Documents are handled for your workspace and never used as public training material.',
+  },
+  {
+    q: 'How do credits work?',
+    a: 'Indexing costs 2 credits, questions cost 1 credit, and edits cost 2 credits. Free members receive 20 one-time credits.',
+  },
+  {
+    q: 'Do you support bulk document generation or data extraction?',
+    a: 'Those accessions are on the index. Understand and Edit are live today; Generate and Extract are next.',
+  },
+];
+
+const FOOTER_LINKS = {
+  Product: [
+    { label: 'Features', href: '#features' },
+    { label: 'Membership', href: '#membership' },
+    { label: 'Index', href: '#index' },
+    { label: 'Sign up', to: '/signup' },
+  ],
+  Company: [
+    { label: 'About', to: '/about' },
+    { label: 'Blog', to: '/blog' },
+    { label: 'Careers', to: '/careers' },
+    { label: 'Contact', to: '/contact' },
+  ],
+  Legal: [
+    { label: 'Privacy', to: '/privacy-policy' },
+    { label: 'Terms', to: '/terms-of-service' },
+    { label: 'Security', to: '/security' },
+    { label: 'GDPR', to: '/gdpr' },
+  ],
+} as const;
+
+/* ------------------------------------------------------------------ */
+/* Hooks                                                               */
+/* ------------------------------------------------------------------ */
+
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Fade elements marked [data-reveal] in once they scroll into view. */
+function useReveal(root: React.RefObject<HTMLElement>) {
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const targets = Array.from(el.querySelectorAll<HTMLElement>('[data-reveal]'));
+
+    if (prefersReducedMotion() || !('IntersectionObserver' in window)) {
+      targets.forEach((t) => t.classList.add('is-in'));
+      return;
+    }
+
+    el.classList.add('is-ready');
+    const io = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            e.target.classList.add('is-in');
+            io.unobserve(e.target);
+          }
+        }),
+      { threshold: 0.12, rootMargin: '0px 0px -6% 0px' },
+    );
+    targets.forEach((t) => io.observe(t));
+    return () => {
+      io.disconnect();
+      el.classList.remove('is-ready');
+    };
+  }, [root]);
+}
+
+/** Tracks scroll progress and which nav section is in view. */
+function useScrollState(ids: string[]) {
+  const [scrolled, setScrolled] = useState(false);
+  const [active, setActive] = useState('');
+  const progressRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      setScrolled(window.scrollY > 12);
+      progressRef.current?.style.setProperty('--p', String(max > 0 ? window.scrollY / max : 0));
     };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (email) {
-      // Handle email submission
-      setEmail('');
-    }
+  useEffect(() => {
+    if (!('IntersectionObserver' in window)) return;
+    const io = new IntersectionObserver(
+      (entries) =>
+        entries.forEach((e) => {
+          if (e.isIntersecting) setActive(e.target.id);
+        }),
+      { rootMargin: '-40% 0px -55% 0px' },
+    );
+    ids.forEach((id) => {
+      const node = document.getElementById(id);
+      if (node) io.observe(node);
+    });
+    return () => io.disconnect();
+  }, [ids]);
+
+  return { scrolled, active, progressRef };
+}
+
+/* ------------------------------------------------------------------ */
+/* Small pieces                                                        */
+/* ------------------------------------------------------------------ */
+
+const SectionLabel: React.FC<{ left: string; right: React.ReactNode }> = ({ left, right }) => (
+  <div className="section-label" data-reveal>
+    <span>{left}</span>
+    <span>{right}</span>
+  </div>
+);
+
+const Logo: React.FC<{ onClick?: () => void }> = ({ onClick }) => (
+  <Link to="/" className="logo" onClick={onClick} aria-label="DocuQuery home">
+    <span className="logo-mark">D</span>
+    DocuQuery
+    <small>REGISTRY NO. 001</small>
+  </Link>
+);
+
+const FaqItem: React.FC<{
+  index: number;
+  q: string;
+  a: string;
+  open: boolean;
+  onToggle: () => void;
+}> = ({ index, q, a, open, onToggle }) => (
+  <div className={`faq-item${open ? ' is-open' : ''}`}>
+    <h3>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={`faq-panel-${index}`}
+        id={`faq-q-${index}`}
+        onClick={onToggle}
+      >
+        <span>{String(index + 1).padStart(2, '0')}</span>
+        <b>{q}</b>
+        <ChevronDown size={18} aria-hidden />
+      </button>
+    </h3>
+    <div className="faq-panel" id={`faq-panel-${index}`} role="region" aria-labelledby={`faq-q-${index}`}>
+      <div>
+        <p>{a}</p>
+      </div>
+    </div>
+  </div>
+);
+
+/* ------------------------------------------------------------------ */
+/* Page                                                                */
+/* ------------------------------------------------------------------ */
+
+const LandingPage: React.FC = () => {
+  const { isAuthenticated } = useAuth();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const heroArtRef = useRef<HTMLDivElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [docIndex, setDocIndex] = useState(0);
+  const [demoPaused, setDemoPaused] = useState(false);
+
+  const ctaTo = isAuthenticated ? '/app' : '/signup';
+  const ctaLabel = isAuthenticated ? 'Open workspace' : 'Start free';
+  const doc = DEMO_DOCS[docIndex];
+
+  useReveal(rootRef);
+  const sectionIds = NAV_LINKS.map((l) => l.id);
+  const { scrolled, active, progressRef } = useScrollState(sectionIds);
+
+  useEffect(() => {
+    const previous = document.title;
+    document.title = 'DocuQuery — Chat with your PDF. Edit it just as fast.';
+    return () => {
+      document.title = previous;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false);
+    const onResize = () => window.innerWidth > 800 && setMenuOpen(false);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [menuOpen]);
+
+  // Cycle the demo documents until the visitor takes over.
+  useEffect(() => {
+    if (demoPaused || prefersReducedMotion()) return;
+    const id = window.setInterval(() => setDocIndex((i) => (i + 1) % DEMO_DOCS.length), 7000);
+    return () => window.clearInterval(id);
+  }, [demoPaused]);
+
+  const onHeroMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'mouse' || prefersReducedMotion()) return;
+    const el = heroArtRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty('--mx', String(((e.clientX - r.left) / r.width - 0.5) * 2));
+    el.style.setProperty('--my', String(((e.clientY - r.top) / r.height - 0.5) * 2));
+  };
+  const onHeroLeave = () => {
+    heroArtRef.current?.style.setProperty('--mx', '0');
+    heroArtRef.current?.style.setProperty('--my', '0');
   };
 
+  const closeMenu = () => setMenuOpen(false);
+
   return (
-    <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled ? 'bg-white/95 backdrop-blur-sm shadow-sm' : 'bg-transparent'
-      }`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <FileText className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold text-gray-900">DocuQuery</span>
-            </div>
-            
-            <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-gray-600 hover:text-gray-900 transition-colors">Features</a>
-              <a href="#integrations" className="text-gray-600 hover:text-gray-900 transition-colors">Integrations</a>
-              <a href="#pricing" className="text-gray-600 hover:text-gray-900 transition-colors">Pricing</a>
-              <a href="#docs" className="text-gray-600 hover:text-gray-900 transition-colors">Docs</a>
-              <Link to="/login" className="text-gray-600 hover:text-gray-900 transition-colors">Login</Link>
-              <Link to="/signup" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                Sign up
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        {/* Animated Glassmorphism Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-          <div className="absolute top-20 left-20 w-72 h-72 bg-blue-400/20 rounded-full mix-blend-multiply filter blur-xl animate-blob"></div>
-          <div className="absolute top-40 right-20 w-72 h-72 bg-purple-400/20 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000"></div>
-          <div className="absolute -bottom-8 left-40 w-72 h-72 bg-pink-400/20 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-4000"></div>
-        </div>
-        
-        {/* Content */}
-        <div className="relative z-10 max-w-6xl mx-auto text-center">
-          {/* <div className="mb-8">
-            <span className="text-blue-600 text-sm font-semibold tracking-wider uppercase">
-              AI Document Processing
-            </span>
-          </div> */}
-          
-          <h1 className="text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
-            Chat & <span className="text-blue-600 relative">
-              Edit
-              {/* <Edit3 className="w-8 h-8 text-blue-500 absolute -top-2 -right-10" /> */}
-            </span>{' '}
-            your documents instantly
-          </h1>
-          
-          <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-4xl mx-auto leading-relaxed">
-            The world's first AI that lets you <strong>edit PDFs while chatting</strong>. 
-            Say "Change name from John to Adam" and watch it happen in 1-2 seconds. 
-            Plus convert to audiobooks and integrate with your favorite tools.
-          </p>
-          
-          {/* USP Highlight */}
-          <div className="glassmorphism-card mx-auto mb-12 max-w-2xl p-6 bg-white/30 backdrop-blur-md border border-white/20 rounded-2xl shadow-lg">
-            <div className="flex items-center justify-center space-x-4 text-gray-800">
-              <div className="flex items-center space-x-2">
-                <Zap className="w-5 h-5 text-yellow-500" />
-                <span className="font-semibold">Real-time PDF Editing</span>
-              </div>
-              <div className="w-px h-6 bg-gray-300"></div>
-              <div className="flex items-center space-x-2">
-                <MessageSquare className="w-5 h-5 text-blue-500" />
-                <span className="font-semibold">AI Conversations</span>
-              </div>
-              <div className="w-px h-6 bg-gray-300"></div>
-              <div className="flex items-center space-x-2">
-                <Headphones className="w-5 h-5 text-purple-500" />
-                <span className="font-semibold">Audio Generation</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Email Signup */}
-          <div className="max-w-md mx-auto mb-16">
-            <form onSubmit={handleSubmit} className="flex bg-gray-100 rounded-2xl p-2">
-              <div className="flex-1 flex items-center px-4">
-                <Mail className="w-5 h-5 text-gray-400 mr-3" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Your email address"
-                  className="flex-1 bg-transparent border-none outline-none text-gray-900 placeholder-gray-500"
-                  required
-                />
-              </div>
-              <button
-                type="submit"
-                className="bg-blue-600 text-white px-8 py-3 rounded-xl hover:bg-blue-700 transition-all duration-200 font-medium"
+    <div className="lp" ref={rootRef}>
+      {/* ---------------- Nav ---------------- */}
+      <header className={`nav-wrap${scrolled ? ' scrolled' : ''}`}>
+        <nav className="nav" aria-label="Primary">
+          <Logo onClick={closeMenu} />
+          <button
+            type="button"
+            className="menu-button"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={menuOpen}
+            aria-controls="nav-links"
+            onClick={() => setMenuOpen((o) => !o)}
+          >
+            {menuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+          <div className={`nav-links${menuOpen ? ' open' : ''}`} id="nav-links">
+            {NAV_LINKS.map((l) => (
+              <a
+                key={l.id}
+                href={l.href}
+                className={active === l.id ? 'active' : undefined}
+                onClick={closeMenu}
               >
-                Get Started
-              </button>
-            </form>
-          </div>
-        </div>
-      </section>
-
-      {/* Interactive Features Section */}
-      <section id="features" className="py-20 bg-gray-900 text-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <span className="text-blue-400 text-sm font-semibold tracking-wider uppercase">
-              Powerful Features
-            </span>
-            <h2 className="text-4xl md:text-5xl font-bold mt-4 mb-6">
-              Features that you{' '}
-              <span className="text-blue-400">📝</span>{' '}
-              need.
-            </h2>
-            <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              Transform documents that normally take hours to process, in minutes. 
-              Real-time PDF editing while chatting. Document conversion in 2 minutes. 
-              Cloud sync in 2 minutes. You get the idea.
-            </p>
-          </div>
-
-          {/* Interactive Feature Pills */}
-          <div className="flex flex-wrap justify-center gap-4 mb-16">
-            {[
-              { id: 0, icon: Upload, label: 'Upload Files' },
-              { id: 1, icon: MessageSquare, label: 'AI Conversations' },
-              { id: 2, icon: Shield, label: 'Data Protection' },
-              { id: 3, icon: Headphones, label: 'Audio Generation' }
-            ].map((feature) => (
-              <button
-                key={feature.id}
-                onClick={() => setActiveFeature(feature.id)}
-                className={`px-6 py-3 rounded-full flex items-center space-x-2 transition-all duration-300 ${
-                  activeFeature === feature.id
-                    ? 'bg-blue-600 text-white shadow-lg scale-105'
-                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                }`}
-              >
-                <feature.icon className="w-5 h-5" />
-                <span>{feature.label}</span>
-              </button>
+                {l.label}
+              </a>
             ))}
+            {!isAuthenticated && (
+              <Link to="/login" className="nav-login" onClick={closeMenu}>
+                Log in
+              </Link>
+            )}
+            <Link to={ctaTo} className="button button-small" onClick={closeMenu}>
+              {isAuthenticated ? 'Open app' : 'Start free'} <ArrowRight size={14} />
+            </Link>
           </div>
+        </nav>
+        <div className="progress" ref={progressRef} aria-hidden />
+      </header>
 
-          {/* Dynamic Feature Content */}
-          <div className="glassmorphism-card bg-gray-800/50 backdrop-blur-md border border-gray-700/50 rounded-3xl p-8">
-            {activeFeature === 0 && (
-              <div className="grid md:grid-cols-2 gap-8 items-center">
-                <div>
-                  <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-6">
-                    <Upload className="w-8 h-8 text-white" />
-                  </div>
-                  <h3 className="text-3xl font-bold mb-4">Smart File Upload</h3>
-                  <p className="text-gray-300 text-lg mb-6">
-                    Drag and drop any document format. Our AI automatically processes PDFs, Word docs, 
-                    PowerPoint presentations, and more. Advanced OCR for scanned documents.
-                  </p>
-                  <ul className="space-y-2 text-gray-300">
-                    <li className="flex items-center space-x-2">
-                      <Check className="w-4 h-4 text-green-500" />
-                      <span>Supports 50+ file formats</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <Check className="w-4 h-4 text-green-500" />
-                      <span>Advanced OCR for scanned documents</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <Check className="w-4 h-4 text-green-500" />
-                      <span>Batch upload up to 100 files</span>
-                    </li>
-                  </ul>
-                </div>
-                <div className="bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl p-6 backdrop-blur-sm">
-                  <div className="space-y-3">
-                    {['Resume.pdf', 'Report.docx', 'Presentation.pptx'].map((file, index) => (
-                      <div key={index} className="flex items-center space-x-3 bg-white/10 rounded-lg p-3">
-                        <FileText className="w-8 h-8 text-blue-400" />
-                        <div className="flex-1">
-                          <div className="font-medium">{file}</div>
-                          <div className="text-sm text-gray-400">Processing...</div>
-                        </div>
-                        <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                          <Check className="w-4 h-4 text-white" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeFeature === 1 && (
-              <div className="grid md:grid-cols-2 gap-8 items-center">
-                <div>
-                  <div className="w-16 h-16 bg-purple-600 rounded-2xl flex items-center justify-center mb-6">
-                    <MessageSquare className="w-8 h-8 text-white" />
-                  </div>
-                  <h3 className="text-3xl font-bold mb-4">AI Chat & Real-time Editing</h3>
-                  <p className="text-gray-300 text-lg mb-6">
-                    Our revolutionary AI doesn't just chat - it edits your PDFs in real-time. 
-                    Ask to change names, dates, or any content and watch it happen instantly.
-                  </p>
-                  <ul className="space-y-2 text-gray-300">
-                    <li className="flex items-center space-x-2">
-                      <Zap className="w-4 h-4 text-yellow-500" />
-                      <span>Real-time PDF editing while chatting</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <Brain className="w-4 h-4 text-purple-500" />
-                      <span>Advanced natural language processing</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <Edit3 className="w-4 h-4 text-blue-500" />
-                      <span>Instant document modifications</span>
-                    </li>
-                  </ul>
-                </div>
-                <div className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl p-6 backdrop-blur-sm">
-                  <div className="space-y-4">
-                    <div className="bg-blue-500 text-white rounded-2xl rounded-bl-sm p-3 ml-8">
-                      "Change the name from John to Adam in my resume"
-                    </div>
-                    <div className="bg-white/10 rounded-2xl rounded-br-sm p-3 mr-8">
-                      ✨ Done! I've updated all instances of 'John' to 'Adam' in your resume. The changes are highlighted for your review.
-                    </div>
-                    <div className="bg-blue-500 text-white rounded-2xl rounded-bl-sm p-3 ml-8">
-                      "Now update the phone number to +1-555-0123"
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeFeature === 2 && (
-              <div className="grid md:grid-cols-2 gap-8 items-center">
-                <div>
-                  <div className="w-16 h-16 bg-green-600 rounded-2xl flex items-center justify-center mb-6">
-                    <Shield className="w-8 h-8 text-white" />
-                  </div>
-                  <h3 className="text-3xl font-bold mb-4">Enterprise-Grade Security</h3>
-                  <p className="text-gray-300 text-lg mb-6">
-                    Your documents are protected with military-grade encryption. 
-                    Zero-knowledge architecture ensures only you can access your content.
-                  </p>
-                  <ul className="space-y-2 text-gray-300">
-                    <li className="flex items-center space-x-2">
-                      <Check className="w-4 h-4 text-green-500" />
-                      <span>AES-256 encryption at rest</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <Check className="w-4 h-4 text-green-500" />
-                      <span>Zero-knowledge architecture</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <Check className="w-4 h-4 text-green-500" />
-                      <span>SOC 2 Type II compliant</span>
-                    </li>
-                  </ul>
-                </div>
-                <div className="bg-gradient-to-br from-green-500/20 to-blue-500/20 rounded-2xl p-6 backdrop-blur-sm">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white/10 rounded-lg p-4 text-center">
-                      <Lock className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                      <div className="font-semibold">Encrypted</div>
-                      <div className="text-sm text-gray-400">AES-256</div>
-                    </div>
-                    <div className="bg-white/10 rounded-lg p-4 text-center">
-                      <Shield className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                      <div className="font-semibold">Protected</div>
-                      <div className="text-sm text-gray-400">99.9% Uptime</div>
-                    </div>
-                    <div className="bg-white/10 rounded-lg p-4 text-center">
-                      <Database className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-                      <div className="font-semibold">Backup</div>
-                      <div className="text-sm text-gray-400">3x Redundancy</div>
-                    </div>
-                    <div className="bg-white/10 rounded-lg p-4 text-center">
-                      <Check className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                      <div className="font-semibold">Compliant</div>
-                      <div className="text-sm text-gray-400">SOC 2</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeFeature === 3 && (
-              <div className="grid md:grid-cols-2 gap-8 items-center">
-                <div>
-                  <div className="w-16 h-16 bg-orange-600 rounded-2xl flex items-center justify-center mb-6">
-                    <Headphones className="w-8 h-8 text-white" />
-                  </div>
-                  <h3 className="text-3xl font-bold mb-4">AI-Powered Audiobooks</h3>
-                  <p className="text-gray-300 text-lg mb-6">
-                    Transform any document into a high-quality audiobook with natural-sounding AI voices. 
-                    Perfect for learning on the go or accessibility needs.
-                  </p>
-                  <ul className="space-y-2 text-gray-300">
-                    <li className="flex items-center space-x-2">
-                      <Check className="w-4 h-4 text-green-500" />
-                      <span>50+ natural AI voices</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <Check className="w-4 h-4 text-green-500" />
-                      <span>Multiple languages supported</span>
-                    </li>
-                    <li className="flex items-center space-x-2">
-                      <Check className="w-4 h-4 text-green-500" />
-                      <span>Adjustable speed and tone</span>
-                    </li>
-                  </ul>
-                </div>
-                <div className="bg-gradient-to-br from-orange-500/20 to-red-500/20 rounded-2xl p-6 backdrop-blur-sm">
-                  <div className="bg-white/10 rounded-xl p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center">
-                          <BookOpen className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                          <div className="font-semibold">Annual Report 2024.pdf</div>
-                          <div className="text-sm text-gray-400">Converting to audiobook...</div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between text-sm">
-                        <span>Voice: Sarah (Professional)</span>
-                        <span>Speed: 1.2x</span>
-                      </div>
-                      <div className="bg-gray-700 rounded-full h-2">
-                        <div className="bg-orange-500 rounded-full h-2" style={{ width: '75%' }}></div>
-                      </div>
-                      <div className="flex items-center justify-center space-x-4">
-                        <Play className="w-8 h-8 text-orange-400" />
-                        <span className="text-sm">3:42 / 15:30</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* Collaboration Section */}
-      <section className="py-20 bg-gradient-to-br from-purple-50 to-blue-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mb-6">
-                <Users className="w-8 h-8 text-purple-600" />
-              </div>
-              <h2 className="text-4xl font-bold text-gray-900 mb-6">
-                Better, together.
-              </h2>
-              <p className="text-lg text-gray-600 mb-8">
-                Want to share your insights with your team? Well you might. 
-                Fortunately DocuQuery supports that. Invite your colleagues or 
-                team members to your workspace in seconds, then use 
-                DocuQuery together.
-              </p>
-              <p className="text-lg text-gray-600 mb-8">
-                Join multiple teams with your account, have control over 
-                different projects.
-              </p>
-              <a href="#docs" className="text-blue-600 hover:text-blue-700 font-medium flex items-center">
-                See Documentation
-                <ArrowRight className="w-4 h-4 ml-1" />
+      <main>
+        {/* ---------------- Hero ---------------- */}
+        <section className="hero">
+          <div className="hero-copy">
+            <div className="eyebrow">
+              <span className="eyebrow-line" />
+              REGISTRY NO. 001
+            </div>
+            <h1>
+              Chat with your PDF.
+              <br />
+              <span>Edit it just as fast.</span>
+            </h1>
+            <p className="hero-sub">
+              Upload any PDF, ask it questions in plain English, and get an answer stamped to the exact page. Need a
+              fix instead? Tell DocuQuery what to change and watch it land in seconds.
+            </p>
+            <div className="hero-actions">
+              <Link to={ctaTo} className="button">
+                {ctaLabel} <ArrowRight size={16} />
+              </Link>
+              <a href="#method" className="text-button">
+                See the method <ArrowRight size={16} />
               </a>
             </div>
+            <div className="hero-proof">
+              <Check size={14} aria-hidden />
+              <span>20 free credits</span>
+              <i aria-hidden />
+              <span>No card needed</span>
+            </div>
+          </div>
 
-            <div className="bg-white rounded-3xl shadow-xl p-8">
-              <div className="bg-purple-50 rounded-2xl p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <Users className="w-5 h-5 text-purple-600 mr-2" />
-                  Invite People
-                </h3>
-                <p className="text-gray-600 mb-4">Invite your members to join your workspace</p>
-                
-                <div className="flex mb-4">
-                  <input
-                    type="email"
-                    placeholder="Add email address"
-                    className="flex-1 px-4 py-2 border border-gray-200 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                  <button className="bg-blue-600 text-white px-6 py-2 rounded-r-lg hover:bg-blue-700">
-                    Send
+          <div className="hero-art" ref={heroArtRef} onPointerMove={onHeroMove} onPointerLeave={onHeroLeave}>
+            <div className="blueprint-grid" aria-hidden />
+            <div className="floating-file" aria-hidden>
+              <div className="file-top">
+                <span className="pdf-pill">PDF</span>
+                <span>INDEXED</span>
+              </div>
+              <FileText size={44} strokeWidth={1.4} />
+              <b>
+                RENTAL
+                <br />
+                AGREEMENT
+              </b>
+              <small>04 pages · 2.4 MB</small>
+              <div className="file-lines">
+                <i />
+                <i />
+                <i />
+                <i />
+              </div>
+            </div>
+            <div className="hero-note note-one">
+              <span>ANSWER FOUND</span>
+              <b>Page 4 · §9.2</b>
+            </div>
+            <div className="hero-note note-two">
+              <span>EDITED IN</span>
+              <b>1.8 seconds</b>
+              <Check size={15} aria-hidden />
+            </div>
+          </div>
+        </section>
+
+        {/* ---------------- File types ---------------- */}
+        <section className="file-types" aria-label="Document types">
+          <p>What gets filed here</p>
+          <div className="marquee">
+            <div className="marquee-track">
+              {[0, 1].map((copy) =>
+                FILE_TYPES.map((t) => (
+                  <React.Fragment key={`${copy}-${t}`}>
+                    <span aria-hidden={copy === 1 || undefined}>{t}</span>
+                    <b aria-hidden>/</b>
+                  </React.Fragment>
+                )),
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* ---------------- Workspace demo ---------------- */}
+        <section className="workspace-section" id="workspace">
+          <SectionLabel
+            left="02 / THE WORKSPACE"
+            right={
+              <span className="live-dot">
+                <i />
+                LIVE DEMO
+              </span>
+            }
+          />
+          <div
+            className="workspace-shell"
+            data-reveal
+            onMouseEnter={() => setDemoPaused(true)}
+            onFocus={() => setDemoPaused(true)}
+          >
+            <aside className="doc-sidebar">
+              <div className="sidebar-head">
+                <span>Your registry</span>
+                <Link to={ctaTo}>
+                  <UploadCloud size={14} aria-hidden /> Add file
+                </Link>
+              </div>
+              <div className="doc-list" role="tablist" aria-label="Sample documents">
+                {DEMO_DOCS.map((d, i) => (
+                  <button
+                    key={d.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={i === docIndex}
+                    className={`doc-item${i === docIndex ? ' active' : ''}`}
+                    onClick={() => {
+                      setDocIndex(i);
+                      setDemoPaused(true);
+                    }}
+                  >
+                    <span className="doc-icon">{d.initials}</span>
+                    <span>
+                      <b>{d.name}</b>
+                      <small>{d.file}</small>
+                    </span>
+                    <CheckCircle2 size={17} aria-hidden />
                   </button>
-                </div>
-
-                <div className="mb-4">
-                  <div className="text-sm font-medium text-gray-700 mb-2">Members (2/10)</div>
-                  
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-purple-200 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-purple-700">L</span>
-                        </div>
-                        <div>
-                          <div className="font-medium text-sm">Lisa Klausson (You)</div>
-                          <div className="text-xs text-gray-500">lisa@docuquery.com</div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-blue-200 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-blue-700">O</span>
-                        </div>
-                        <div>
-                          <div className="font-medium text-sm">Oguz Yagiz Kara</div>
-                          <div className="text-xs text-gray-500">oguz@docuquery.com</div>
-                        </div>
-                      </div>
-                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
-                        Invite Sent
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                ))}
               </div>
-              
-              <div className="mt-6 flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-gray-900 rounded-full flex items-center justify-center">
-                    <FileText className="w-4 h-4 text-white" />
-                  </div>
-                  <span className="font-medium">DocuQuery</span>
+              <div className="credit-meter">
+                <div>
+                  <span>Free credits</span>
+                  <span>
+                    <b>20</b> <em>/ 20</em>
+                  </span>
                 </div>
-                <span className="text-sm text-gray-500">docuquery.com</span>
+                <div className="meter" aria-hidden>
+                  <i />
+                </div>
+                <small>Good for your first filing.</small>
+              </div>
+            </aside>
+
+            <div className="workspace-main" role="tabpanel">
+              <div className="workspace-toolbar">
+                <span>
+                  <FileText size={15} aria-hidden />
+                  <span>{doc.file}</span>
+                </span>
+                <span className="toolbar-status">
+                  <i />
+                  Indexed {doc.pages} pages
+                </span>
+              </div>
+              <div className="workspace-grid">
+                <div className="query-panel" key={`q-${doc.key}`}>
+                  <div className="panel-kicker">
+                    <Sparkles size={14} aria-hidden /> ASK &amp; VERIFY
+                  </div>
+                  <h3>{doc.question}</h3>
+                  <div className="answer-card">
+                    <div className="answer-label">Answer</div>
+                    <p>{doc.answer}</p>
+                    <span className="citation">
+                      <Quote size={13} aria-hidden /> {doc.cite} <ArrowRight size={13} aria-hidden />
+                    </span>
+                  </div>
+                  <div className="ask-row">
+                    <Search size={16} aria-hidden />
+                    <span>Ask another question…</span>
+                    <Link to={ctaTo} className="ask-btn">
+                      Ask <ArrowRight size={13} aria-hidden />
+                    </Link>
+                  </div>
+                </div>
+                <div className="edit-panel" key={`e-${doc.key}`}>
+                  <div className="panel-kicker">
+                    <Wand2 size={14} aria-hidden /> EDIT LOG
+                  </div>
+                  <div className="edit-card">
+                    <div className="edit-tag">
+                      <span>Amendment</span>
+                      <span>EDITED · {doc.seconds}S</span>
+                    </div>
+                    <p>
+                      <span className="old">{doc.before}</span>
+                    </p>
+                    <p className="corrected">
+                      {doc.after} <Check size={14} aria-hidden />
+                    </p>
+                    <div className="edit-rule" />
+                    <Link to={ctaTo}>
+                      Download edited PDF <ArrowRight size={14} aria-hidden />
+                    </Link>
+                  </div>
+                  <div className="preserve-note">
+                    <ShieldCheck size={18} aria-hidden />
+                    <span>
+                      Original formatting preserved
+                      <br />
+                      <b>Normal PDF output, not a screenshot</b>
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Integrations Section */}
-      <section id="integrations" className="py-20 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <span className="text-blue-600 text-sm font-semibold tracking-wider uppercase">
-              Integrations
-            </span>
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mt-4 mb-6">
-              Works with your{' '}
-              <span className="text-blue-600">favorite tools</span>
+        {/* ---------------- Method ---------------- */}
+        <section className="section-wrap band band-white method" id="method">
+          <SectionLabel left="03 / THE METHOD" right="HOW IT WORKS" />
+          <div className="method-head" data-reveal>
+            <h2 className="section-title">
+              One document.
+              <br />
+              <em>Three clean moves.</em>
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Seamlessly connect DocuQuery with the tools you already use. 
-              One-click integration with popular cloud storage and productivity platforms.
+            <p>
+              Not a chatbot bolted onto a PDF viewer — a registry built around getting a real answer, or a real fix,
+              out of your document.
             </p>
           </div>
-
-          {/* Real Integration Logos */}
-          <div className="relative">
-            <div className="flex justify-center items-center flex-wrap gap-8 mb-12">
-              {/* Google Drive */}
-              <div className="w-24 h-24 bg-white shadow-lg rounded-2xl flex items-center justify-center hover:shadow-xl hover:scale-105 transition-all duration-300 group">
-                <img 
-                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/2295px-Google_Drive_icon_%282020%29.svg.png"
-                  alt="Google Drive"
-                  className="w-12 h-12 object-contain"
-                />
-              </div>
-
-              {/* OneDrive */}
-              <div className="w-24 h-24 bg-white shadow-lg rounded-2xl flex items-center justify-center hover:shadow-xl hover:scale-105 transition-all duration-300 group">
-                <img 
-                  src="https://logos-world.net/wp-content/uploads/2022/04/OneDrive-Symbol.png"
-                  alt="OneDrive"
-                  className="w-12 h-12 object-contain"
-                />
-              </div>
-
-              {/* Atlassian */}
-              <div className="w-24 h-24 bg-white shadow-lg rounded-2xl flex items-center justify-center hover:shadow-xl hover:scale-105 transition-all duration-300 group">
-                <img 
-                  src="https://logos-world.net/wp-content/uploads/2023/03/Atlassian-Logo.png"
-                  alt="Atlassian"
-                  className="w-12 h-12 object-contain"
-                />
-              </div>
-
-              {/* Zoho */}
-              <div className="w-24 h-24 bg-white shadow-lg rounded-2xl flex items-center justify-center hover:shadow-xl hover:scale-105 transition-all duration-300 group">
-                <img 
-                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/ZOHO_logo_2023.svg/2560px-ZOHO_logo_2023.svg.png"
-                  alt="Zoho"
-                  className="w-12 h-12 object-contain"
-                />
-              </div>
-
-              {/* AWS */}
-              <div className="w-24 h-24 bg-white shadow-lg rounded-2xl flex items-center justify-center hover:shadow-xl hover:scale-105 transition-all duration-300 group">
-                <img 
-                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/Amazon_Web_Services_Logo.svg/2560px-Amazon_Web_Services_Logo.svg.png"
-                  alt="Amazon Web Services"
-                  className="w-12 h-12 object-contain"
-                />
-              </div>
-
-              {/* Microsoft Azure */}
-              <div className="w-24 h-24 bg-white shadow-lg rounded-2xl flex items-center justify-center hover:shadow-xl hover:scale-105 transition-all duration-300 group">
-                <img 
-                  src="https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Microsoft_Azure.svg/2048px-Microsoft_Azure.svg.png"
-                  alt="Microsoft Azure"
-                  className="w-12 h-12 object-contain"
-                />
-              </div>
-            </div>
-
-            {/* Floating Animation */}
-            <div className="absolute top-0 left-1/4 w-16 h-16 bg-blue-500 rounded-full opacity-10 animate-float"></div>
-            <div className="absolute top-8 right-1/4 w-12 h-12 bg-purple-500 rounded-full opacity-10 animate-float-delay"></div>
-          </div>
-
-          {/* Integration Features Grid */}
-          <div className="glassmorphism-card bg-gray-50/80 backdrop-blur-sm border border-gray-200/50 rounded-3xl p-8">
-            <div className="grid md:grid-cols-3 gap-8">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-blue-600 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-                  <Globe className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="font-semibold mb-2 text-lg">Cloud Storage</h3>
-                <p className="text-gray-600">Direct access to Google Drive, OneDrive, Dropbox, and more</p>
-              </div>
-
-              <div className="text-center">
-                <div className="w-16 h-16 bg-purple-600 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-                  <Users className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="font-semibold mb-2 text-lg">Team Collaboration</h3>
-                <p className="text-gray-600">Seamless integration with Slack, Teams, and Atlassian tools</p>
-              </div>
-
-              <div className="text-center">
-                <div className="w-16 h-16 bg-green-600 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-                  <Star className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="font-semibold mb-2 text-lg">Productivity Suite</h3>
-                <p className="text-gray-600">Connect with Office 365, G Suite, and Zoho Workplace</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-gray-900 via-blue-900 to-purple-900 text-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="mb-8">
-            <span className="text-blue-400 text-sm font-semibold tracking-wider uppercase">
-              Let's Get Started!
-            </span>
-          </div>
-          
-          <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            Intelligent Document Processing
-          </h2>
-          
-          <p className="text-xl text-gray-300 mb-12 max-w-2xl mx-auto">
-            Create your account and start processing documents with AI. 
-            Upload, chat, convert, and sync - it only takes 2 minutes to 
-            setup your workspace.
-          </p>
-
-          <div className="max-w-md mx-auto">
-            <form onSubmit={handleSubmit} className="flex bg-white/10 backdrop-blur-sm rounded-2xl p-2">
-              <div className="flex-1 flex items-center px-4">
-                <Mail className="w-5 h-5 text-gray-300 mr-3" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Your email address"
-                  className="flex-1 bg-transparent border-none outline-none text-white placeholder-gray-300"
-                  required
-                />
-              </div>
-              <button
-                type="submit"
-                className="bg-white text-gray-900 px-8 py-3 rounded-xl hover:bg-gray-100 transition-all duration-200 font-medium"
-              >
-                Get Started
-              </button>
-            </form>
-          </div>
-        </div>
-      </section>
-
-      {/* Interactive FAQ Section */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <span className="text-blue-600 text-sm font-semibold tracking-wider uppercase">
-              FAQ
-            </span>
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mt-4 mb-6">
-              Frequently asked questions
-            </h2>
-            <p className="text-xl text-gray-600">
-              Got questions? We've got answers.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            {[
-              {
-                question: "How does the real-time PDF editing work?",
-                answer: "Our revolutionary AI doesn't just chat - it actually edits your PDFs in real-time. Simply ask to change names, dates, addresses, or any content and watch it happen instantly. For example, say 'Change the name from John to Adam' and see it updated in 1-2 seconds across your entire document."
-              },
-              {
-                question: "What file formats are supported?",
-                answer: "We support PDF, Word (DOC/DOCX), PowerPoint (PPT/PPTX), Excel (XLS/XLSX), text files, and most image formats with OCR capabilities. Our advanced AI can process over 50 different file types."
-              },
-              {
-                question: "Is my data secure?",
-                answer: "Yes, we use enterprise-grade AES-256 encryption and follow strict security protocols. Your documents are encrypted both in transit and at rest. We're SOC 2 Type II compliant with zero-knowledge architecture - only you can access your content."
-              },
-              {
-                question: "Can I integrate with my existing tools?",
-                answer: "Absolutely! DocuQuery integrates seamlessly with Google Drive, OneDrive, Dropbox, Atlassian tools, Slack, Microsoft Teams, Zoho Workplace, and many more. One-click integration gets you started in seconds."
-              },
-              {
-                question: "How accurate is the AI and document conversion?",
-                answer: "Our AI-powered processing achieves 99%+ accuracy for most document types, with advanced OCR for scanned documents. The real-time editing feature maintains formatting integrity while making precise content changes."
-              },
-              {
-                question: "Can I convert documents to audiobooks?",
-                answer: "Yes! Our AI can convert any document to high-quality audiobooks with 50+ natural-sounding voices in multiple languages. Perfect for learning on the go, accessibility needs, or when you prefer listening to reading."
-              }
-            ].map((faq, index) => (
-              <div key={index} className="glassmorphism-card bg-white/80 backdrop-blur-sm border border-gray-200/50 rounded-2xl overflow-hidden">
-                <button
-                  onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                  className="w-full p-6 text-left flex items-center justify-between hover:bg-gray-50/50 transition-colors"
-                >
-                  <h3 className="text-lg font-semibold text-gray-900">{faq.question}</h3>
-                  <div className="flex-shrink-0 ml-4">
-                    {openFaq === index ? (
-                      <ChevronUp className="w-5 h-5 text-gray-500" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5 text-gray-500" />
-                    )}
-                  </div>
-                </button>
-                {openFaq === index && (
-                  <div className="px-6 pb-6">
-                    <div className="border-t border-gray-200 pt-4">
-                      <p className="text-gray-600 leading-relaxed">{faq.answer}</p>
-                    </div>
-                  </div>
-                )}
+          <div className="steps">
+            {STEPS.map((s, i) => (
+              <div className="step" key={s.title} data-reveal style={{ '--d': `${i * 110}ms` } as React.CSSProperties}>
+                <span>{String(i + 1).padStart(2, '0')}</span>
+                <ArrowUpRight size={18} aria-hidden />
+                <h3>{s.title}</h3>
+                <p>{s.body}</p>
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-xl font-bold">DocuQuery</span>
-              </div>
-              <p className="text-gray-400 text-sm">
-                Intelligent document processing powered by AI. Chat, convert, and collaborate with your documents.
+        {/* ---------------- Features ---------------- */}
+        <section className="section-wrap feature-section" id="features">
+          <SectionLabel left="04 / EVERYTHING ON FILE" right="BUILT FOR THE FULL LOOP" />
+          <div className="feature-grid">
+            <div className="feature-intro" data-reveal>
+              <h2 className="section-title">
+                Ask anything.
+                <br />
+                <em>Verify everything.</em>
+              </h2>
+              <p>
+                Ask your document a question in plain language and get an answer grounded in the actual text — with
+                the page and section stamped on the card.
               </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold mb-4">Product</h3>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#integrations" className="hover:text-white transition-colors">Integrations</a></li>
-                <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="#docs" className="hover:text-white transition-colors">Documentation</a></li>
+              <ul className="check-list">
+                {[
+                  'Every answer cites its source page',
+                  'Click a citation to jump straight to it',
+                  'Works on contracts, statements, papers, notices',
+                ].map((t) => (
+                  <li key={t}>
+                    <Check size={16} aria-hidden />
+                    {t}
+                  </li>
+                ))}
               </ul>
             </div>
-
-            <div>
-              <h3 className="font-semibold mb-4">Company</h3>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><Link to="/about" className="hover:text-white transition-colors">About</Link></li>
-                <li><Link to="/blog" className="hover:text-white transition-colors">Blog</Link></li>
-                <li><Link to="/careers" className="hover:text-white transition-colors">Careers</Link></li>
-                <li><Link to="/contact" className="hover:text-white transition-colors">Contact</Link></li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-semibold mb-4">Legal</h3>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li><Link to="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
-                <li><Link to="/terms-of-service" className="hover:text-white transition-colors">Terms of Service</Link></li>
-                <li><Link to="/security" className="hover:text-white transition-colors">Security</Link></li>
-                <li><Link to="/gdpr" className="hover:text-white transition-colors">GDPR</Link></li>
-              </ul>
+            <div className="loan-card" data-reveal style={{ '--d': '120ms' } as React.CSSProperties}>
+              <div>
+                <span>LOAN_SANCTION.PDF</span>
+                <span className="blue-tag">CITED</span>
+              </div>
+              <p>“What was the total loan amount and the interest rate?”</p>
+              <blockquote>
+                The sanctioned amount is <strong>₹12,00,000</strong> at <strong>8.9% p.a.</strong> reducing balance.
+              </blockquote>
+              <span className="citation">
+                Page 2 · §3.1 <ArrowRight size={13} aria-hidden />
+              </span>
             </div>
           </div>
+        </section>
 
-          <div className="border-t border-gray-800 mt-12 pt-8 text-center">
-            <p className="text-gray-400 text-sm">
-              © 2025 DocuQuery. All rights reserved. Made with ❤️ for document lovers.
-            </p>
+        {/* ---------------- Roadmap ---------------- */}
+        <section className="section-wrap band band-tint accession" id="index">
+          <SectionLabel left="05 / ACCESSION LOG" right="THE ROAD AHEAD" />
+          <div className="accession-head" data-reveal>
+            <h2 className="section-title">
+              Generate. Understand.
+              <br />
+              <em>Extract. Repeat.</em>
+            </h2>
+            <p>The full loop we’re building toward. Two stages are live.</p>
           </div>
+          <div className="accession-grid">
+            {ROADMAP.map((r, i) => (
+              <div
+                className={`accession-item${r.live ? '' : ' pending'}`}
+                key={r.title}
+                data-reveal
+                style={{ '--d': `${i * 90}ms` } as React.CSSProperties}
+              >
+                <span>{String(i + 1).padStart(2, '0')}</span>
+                <h3>
+                  {r.title}
+                  <small>{r.live ? 'Live' : 'Pending'}</small>
+                </h3>
+                <p>{r.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ---------------- Audience ---------------- */}
+        <section className="section-wrap audience">
+          <SectionLabel left="06 / PATRON FILES" right="WHO IT’S FOR" />
+          <div className="audience-grid">
+            <article data-reveal>
+              <div className="audience-label">Individual</div>
+              <h3>
+                For anyone
+                <br />
+                with a PDF
+              </h3>
+              <p>
+                You got a document on WhatsApp or email and just need to know what it says — or fix a typo before you
+                sign it.
+              </p>
+              <ul>
+                <li>“What’s the notice period in my lease?”</li>
+                <li>“Fix the typo in my name”</li>
+                <li>“Pull the methodology section”</li>
+              </ul>
+            </article>
+            <article className="dark" data-reveal style={{ '--d': '120ms' } as React.CSSProperties}>
+              <div className="audience-label">Business</div>
+              <h3>
+                For CA firms,
+                <br />
+                HR teams &amp; agencies
+              </h3>
+              <p>
+                Query and edit any client file in seconds. Next accession: generate hundreds of filing or offer
+                letters from one spreadsheet.
+              </p>
+              <ul>
+                <li>Answer engagement letter questions instantly</li>
+                <li>Correct a CTC or name before sending</li>
+                <li>Bulk-generate letters from Excel</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        {/* ---------------- Comparison ---------------- */}
+        <section className="section-wrap band band-white comparison">
+          <SectionLabel left="07 / CROSS-REFERENCE" right="NO COMPROMISES" />
+          <h2 className="section-title" data-reveal>
+            Chat tools can’t edit.
+            <br />
+            <em>Editors can’t chat.</em>
+          </h2>
+          <div className="table-scroll" data-reveal>
+            <div className="compare-table" role="table" aria-label="Feature comparison">
+              <div className="table-row table-head" role="row">
+                <span role="columnheader">Tool</span>
+                <span role="columnheader">Chat</span>
+                <span role="columnheader">Edit</span>
+                <span role="columnheader">Cited</span>
+                <span role="columnheader">Price</span>
+              </div>
+              {COMPARISON.map((r) => (
+                <div className={`table-row${r.ours ? ' ours' : ''}`} role="row" key={r.tool}>
+                  <span role="cell">{r.tool}</span>
+                  {[r.chat, r.edit, r.cited].map((v, i) => (
+                    <span role="cell" key={i}>
+                      {v ? (
+                        <Check size={16} aria-label="Yes" />
+                      ) : (
+                        <Minus size={14} className="dash" aria-label="No" />
+                      )}
+                    </span>
+                  ))}
+                  <span role="cell">{r.price}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ---------------- Pricing ---------------- */}
+        <section className="section-wrap band band-tint pricing" id="membership">
+          <SectionLabel left="08 / MEMBERSHIP" right="PAY ONLY IF YOU FILE WEEKLY" />
+          <div className="pricing-head" data-reveal>
+            <h2 className="section-title">
+              Start free.
+              <br />
+              <em>Stay in control.</em>
+            </h2>
+            <p>No trials that expire, no card required to try it.</p>
+          </div>
+          <div className="pricing-grid">
+            {PLANS.map((p, i) => (
+              <div
+                className={`price-card${p.featured ? ' featured' : ''}`}
+                key={p.key}
+                data-reveal
+                style={{ '--d': `${i * 100}ms` } as React.CSSProperties}
+              >
+                {p.featured && <span className="most-filed">MOST FILED</span>}
+                <div className="price-name">{p.key}</div>
+                <h3>
+                  {p.price}
+                  {p.per && <small>{p.per}</small>}
+                </h3>
+                <p>{p.blurb}</p>
+                <b className="credits">{p.credits}</b>
+                <ul>
+                  {p.features.map((f) => (
+                    <li key={f}>
+                      <Check size={15} aria-hidden />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link to={ctaTo} className={p.featured ? 'button' : 'outline-button'}>
+                  {p.cta} <ArrowRight size={14} />
+                </Link>
+              </div>
+            ))}
+          </div>
+          <div className="tariff" data-reveal>
+            <span>Credit tariff</span>
+            {TARIFF.map((t) => (
+              <b key={t.label}>
+                {t.label} <i>{t.cost}</i>
+              </b>
+            ))}
+          </div>
+        </section>
+
+        {/* ---------------- FAQ ---------------- */}
+        <section className="section-wrap band band-white faq">
+          <SectionLabel left="09 / CARD INDEX" right="COMMON QUESTIONS" />
+          <div className="faq-grid">
+            <h2 className="section-title" data-reveal>
+              Worth knowing
+              <br />
+              <em>before filing.</em>
+            </h2>
+            <div data-reveal style={{ '--d': '100ms' } as React.CSSProperties}>
+              {FAQS.map((f, i) => (
+                <FaqItem
+                  key={f.q}
+                  index={i}
+                  q={f.q}
+                  a={f.a}
+                  open={openFaq === i}
+                  onToggle={() => setOpenFaq(openFaq === i ? null : i)}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ---------------- Closing CTA ---------------- */}
+        <section className="closing">
+          <div className="closing-mark" data-reveal aria-hidden>
+            DQ
+          </div>
+          <h2 data-reveal style={{ '--d': '80ms' } as React.CSSProperties}>
+            Stop reading 40 pages
+            <br />
+            <em>to find one answer.</em>
+          </h2>
+          <p data-reveal style={{ '--d': '160ms' } as React.CSSProperties}>
+            Upload your first PDF and ask it a question — free, no card required.
+          </p>
+          <div data-reveal style={{ '--d': '240ms' } as React.CSSProperties}>
+            <Link to={ctaTo} className="button">
+              {ctaLabel} <ArrowRight size={16} />
+            </Link>
+          </div>
+        </section>
+      </main>
+
+      {/* ---------------- Footer ---------------- */}
+      <footer className="footer">
+        <div>
+          <Logo />
+          <p>
+            The registry for chatting with,
+            <br />
+            editing, and understanding your PDFs.
+          </p>
         </div>
+        <nav className="footer-links" aria-label="Footer">
+          {Object.entries(FOOTER_LINKS).map(([heading, links]) => (
+            <div key={heading}>
+              <b>{heading}</b>
+              {links.map((l) =>
+                'to' in l ? (
+                  <Link key={l.label} to={l.to}>
+                    {l.label}
+                  </Link>
+                ) : (
+                  <a key={l.label} href={l.href}>
+                    {l.label}
+                  </a>
+                ),
+              )}
+            </div>
+          ))}
+        </nav>
+        <small>© {new Date().getFullYear()} DocuQuery — All rights reserved</small>
       </footer>
-
-      <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-20px); }
-        }
-        
-        @keyframes float-delayed {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-15px); }
-        }
-
-        @keyframes blob {
-          0% {
-            transform: translate(0px, 0px) scale(1);
-          }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-          100% {
-            transform: translate(0px, 0px) scale(1);
-          }
-        }
-        
-        .animate-float {
-          animation: float 6s ease-in-out infinite;
-        }
-        
-        .animate-float-delayed {
-          animation: float-delayed 6s ease-in-out infinite 2s;
-        }
-
-        .animate-float-delay {
-          animation: float 8s ease-in-out infinite 3s;
-        }
-
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-
-        .glassmorphism-card {
-          background: rgba(255, 255, 255, 0.1);
-          backdrop-filter: blur(10px);
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-        }
-
-        .glassmorphism-card:hover {
-          background: rgba(255, 255, 255, 0.15);
-          transform: translateY(-2px);
-          transition: all 0.3s ease;
-        }
-
-        /* Grainy texture effect */
-        .glassmorphism-card::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background-image: 
-            radial-gradient(circle at 1px 1px, rgba(255,255,255,.15) 1px, transparent 0);
-          background-size: 20px 20px;
-          opacity: 0.5;
-          pointer-events: none;
-          border-radius: inherit;
-        }
-
-        /* Enhanced gradient backgrounds */
-        .gradient-bg {
-          background: linear-gradient(135deg, 
-            rgba(99, 102, 241, 0.1) 0%, 
-            rgba(219, 234, 254, 0.1) 25%, 
-            rgba(252, 231, 243, 0.1) 50%, 
-            rgba(233, 213, 255, 0.1) 75%, 
-            rgba(186, 230, 253, 0.1) 100%);
-        }
-      `}</style>
     </div>
   );
 };

@@ -20,6 +20,10 @@ export interface DocumentType {
   messages: MessageType[];
   filePath: string;
   editedVersion?: string;
+  /** ISO timestamp of the upload, for display and sorting. */
+  uploadedAt: string;
+  /** Shared with the user's team. */
+  shared: boolean;
 }
 
 export type PlanId = 'free' | 'starter' | 'pro' | 'team';

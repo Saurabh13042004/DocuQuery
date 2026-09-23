@@ -1,181 +1,231 @@
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import {
-  FileText, Upload, Clock, Star, Folder, MessageSquare,
-  Trash2, Settings, User, LogOut, Home, Cloud, Zap, CreditCard, Crown, Users,
+  ChevronsUpDown, Clock, Cloud, CreditCard, Home, LogOut, Plus, Star, User as UserIcon, Users, X, Zap,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
 import { useAuth } from '../context/AuthContext';
 import { PlanId } from '../types';
 
 interface SidebarProps {
   onUploadClick: () => void;
+  /** Mobile drawer state. On desktop the sidebar is always visible. */
+  open: boolean;
+  onClose: () => void;
 }
 
 const PLAN_BADGE: Record<PlanId, { label: string; className: string }> = {
-  free: { label: 'Free', className: 'bg-muted text-muted-foreground border-border' },
-  starter: { label: 'Starter', className: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400' },
-  pro: { label: 'Pro', className: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400' },
-  team: { label: 'Team', className: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400' },
+  free: { label: 'Free', className: 'bg-secondary text-muted-foreground' },
+  starter: { label: 'Starter', className: 'bg-accent text-accent-foreground' },
+  pro: { label: 'Pro', className: 'bg-foreground text-background' },
+  team: { label: 'Team', className: 'bg-success/15 text-[#1f7a5a]' },
 };
 
-const Sidebar: React.FC<SidebarProps> = ({ onUploadClick }) => {
-  const location = useLocation();
+const CREDIT_CAP: Record<PlanId, number> = { free: 20, starter: 500, pro: 2000, team: 1500 };
+
+const NAV: { label: string; items: { icon: React.ElementType; label: string; to: string; end?: boolean }[] }[] = [
+  {
+    label: 'Workspace',
+    items: [
+      { icon: Home, label: 'Dashboard', to: '/app', end: true },
+      { icon: Clock, label: 'Recent', to: '/app/recent' },
+      { icon: Star, label: 'Starred', to: '/app/starred' },
+    ],
+  },
+  {
+    label: 'Collaborate',
+    items: [
+      { icon: Users, label: 'Team', to: '/app/team' },
+      { icon: Cloud, label: 'Integrations', to: '/app/integrations' },
+    ],
+  },
+  {
+    label: 'Account',
+    items: [{ icon: CreditCard, label: 'Plans & credits', to: '/app/plans' }],
+  },
+];
+
+const Sidebar: React.FC<SidebarProps> = ({ onUploadClick, open, onClose }) => {
   const navigate = useNavigate();
   const { user, logout, team } = useAuth();
 
-  const handleLogout = () => { logout(); navigate('/'); };
-  const isActive = (path: string) => location.pathname === path;
-
-  const mainNavItems = [
-    { icon: Home, label: 'Dashboard', path: '/app' },
-    { icon: Clock, label: 'Recent', path: '/app/recent' },
-    { icon: Star, label: 'Starred', path: '/app/starred' },
-    { icon: Folder, label: 'Folders', path: '/app/folders' },
-    { icon: Users, label: 'Team', path: '/app/team' },
-    { icon: Cloud, label: 'Integrations', path: '/app/integrations' },
-  ];
-
-  const secondaryNavItems = [
-    { icon: MessageSquare, label: 'Chat History', path: '/app/chat-history' },
-    { icon: Zap, label: 'Tools', path: '/app/tools' },
-    { icon: Trash2, label: 'Trash', path: '/app/trash' },
-    { icon: Settings, label: 'Settings', path: '/app/settings' },
-  ];
-
   const plan = (user?.plan ?? 'free') as PlanId;
   const credits = user?.credits ?? 0;
-  const planBadge = PLAN_BADGE[plan];
+  const badge = PLAN_BADGE[plan];
+  const pct = Math.min(100, Math.round((credits / CREDIT_CAP[plan]) * 100));
+  const low = pct <= 20;
 
-  // credit bar: cap at whichever monthly limit makes sense for display
-  const creditCap = plan === 'team' ? 1500 : plan === 'pro' ? 2000 : plan === 'starter' ? 500 : 20;
-  const barPct = Math.min(100, Math.round((credits / creditCap) * 100));
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
 
   return (
-    <div className="w-64 bg-background border-r border-border h-screen flex flex-col">
-      {/* Logo */}
-      <div className="p-6 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <FileText className="h-5 w-5 text-primary-foreground" />
+    <>
+      {/* Backdrop (mobile only) */}
+      <div
+        aria-hidden
+        onClick={onClose}
+        className={cn(
+          'fixed inset-0 z-40 bg-foreground/40 backdrop-blur-[2px] transition-opacity duration-300 lg:hidden',
+          open ? 'opacity-100' : 'pointer-events-none opacity-0',
+        )}
+      />
+
+      <aside
+        aria-label="Sidebar"
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 flex w-[284px] max-w-[86vw] flex-col border-r bg-card',
+          'transition-[transform,visibility] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]',
+          'lg:static lg:z-auto lg:w-[264px] lg:max-w-none lg:shrink-0 lg:translate-x-0 lg:visible',
+          open ? 'visible translate-x-0 shadow-2xl' : 'invisible -translate-x-full',
+        )}
+      >
+        {/* Brand */}
+        <div className="flex h-16 shrink-0 items-center justify-between px-5">
+          <Link to="/app" className="flex items-center gap-[9px] font-extrabold tracking-[-0.04em]">
+            <span className="grid h-[29px] w-[29px] place-items-center rounded-[9px] bg-primary text-base text-primary-foreground">
+              D
+            </span>
+            <span className="text-[19px]">DocuQuery</span>
+          </Link>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close navigation"
+            className="grid h-9 w-9 place-items-center rounded-[9px] text-muted-foreground transition-colors hover:bg-accent lg:hidden"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Upload */}
+        {team?.role !== 'viewer' && (
+          <div className="px-4 pb-3 pt-1">
+            <button
+              type="button"
+              onClick={onUploadClick}
+              className="flex h-10 w-full items-center justify-center gap-2 rounded-[9px] bg-primary text-sm font-bold text-primary-foreground shadow-[0_7px_18px_rgba(37,99,235,0.15)] transition-all hover:-translate-y-px hover:bg-[#1d4ed8] hover:shadow-[0_10px_24px_rgba(37,99,235,0.23)] active:scale-[0.98]"
+            >
+              <Plus className="h-4 w-4" /> Upload PDF
+            </button>
           </div>
-          <span className="text-xl font-bold text-foreground">DocuQuery</span>
-        </div>
-      </div>
+        )}
 
-      {/* Upload */}
-      {team?.role !== 'viewer' && (
-        <div className="p-4">
-          <Button onClick={onUploadClick} className="w-full gap-2" size="default">
-            <Upload className="h-4 w-4" />
-            Upload PDF
-          </Button>
-        </div>
-      )}
-
-      {/* Navigation */}
-      <nav className="flex-1 px-3 overflow-y-auto">
-        <div className="space-y-1 mb-6">
-          {mainNavItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isActive(item.path)
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-              }`}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-            </Link>
-          ))}
-        </div>
-
-        <Separator className="my-4" />
-
-        <div className="space-y-1">
-          {secondaryNavItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isActive(item.path)
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-              }`}
-            >
-              <item.icon className="h-4 w-4" />
-              {item.label}
-            </Link>
-          ))}
-        </div>
-      </nav>
-
-      {/* Credits widget */}
-      <div className="px-4 pb-2">
-        <Link
-          to="/app/plans"
-          className="block rounded-xl border border-border bg-muted/30 hover:bg-muted/60 transition-colors p-3"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1.5">
-              <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs font-medium text-foreground">{credits} credits</span>
+        {/* Navigation */}
+        <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-4" aria-label="Main">
+          {NAV.map((group) => (
+            <div key={group.label} className="mt-5 first:mt-2">
+              <div className="kicker px-3 pb-2">{group.label}</div>
+              <ul className="space-y-0.5">
+                {group.items.map((item) => (
+                  <li key={item.to}>
+                    <NavLink
+                      to={item.to}
+                      end={item.end}
+                      className={({ isActive }) =>
+                        cn(
+                          'group relative flex items-center gap-3 rounded-[9px] px-3 py-2 text-[13.5px] font-bold transition-colors',
+                          isActive
+                            ? 'bg-accent text-primary'
+                            : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                        )
+                      }
+                    >
+                      {({ isActive }) => (
+                        <>
+                          <span
+                            aria-hidden
+                            className={cn(
+                              'absolute -left-3 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-primary transition-opacity',
+                              isActive ? 'opacity-100' : 'opacity-0',
+                            )}
+                          />
+                          <item.icon className="h-4 w-4 shrink-0" />
+                          {item.label}
+                        </>
+                      )}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-4 ${planBadge.className}`}>
-              {plan === 'pro' && <Crown className="h-2.5 w-2.5 mr-0.5" />}
-              {planBadge.label}
-            </Badge>
-          </div>
+          ))}
+        </nav>
 
-          {/* progress bar */}
-          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all ${
-                barPct > 50 ? 'bg-primary' : barPct > 20 ? 'bg-amber-400' : 'bg-red-500'
-              }`}
-              style={{ width: `${barPct}%` }}
-            />
-          </div>
-
-          {plan === 'free' && (
-            <p className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-1">
-              <Zap className="h-2.5 w-2.5" /> Upgrade for more credits
-            </p>
-          )}
-        </Link>
-      </div>
-
-      {/* User profile */}
-      <div className="p-4 border-t border-border">
-        <div className="flex items-center gap-3 mb-3">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="text-xs">
-              {user?.name?.charAt(0)?.toUpperCase() ?? 'U'}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">{user?.name ?? 'User'}</p>
-            <p className="text-xs text-muted-foreground truncate">{user?.email ?? ''}</p>
-          </div>
+        {/* Credits */}
+        <div className="px-4 pb-3">
+          <Link
+            to="/app/plans"
+            className="group block rounded-xl border bg-[#f7faff] p-3.5 transition-colors hover:border-primary/40"
+          >
+            <div className="flex items-center justify-between">
+              <span className="kicker">Credits</span>
+              <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-bold', badge.className)}>{badge.label}</span>
+            </div>
+            <div className="mt-2 flex items-baseline gap-1.5">
+              <span className="font-mono text-xl font-medium leading-none">{credits}</span>
+              <span className="font-mono text-[11px] text-muted-foreground">/ {CREDIT_CAP[plan].toLocaleString()}</span>
+            </div>
+            <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[#dbe8f9]">
+              <div
+                className={cn('h-full rounded-full transition-[width] duration-700', low ? 'bg-destructive' : 'bg-primary')}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            {plan === 'free' && (
+              <p className="mt-2.5 flex items-center gap-1 text-[11px] font-bold text-primary">
+                <Zap className="h-3 w-3" /> Get more credits
+              </p>
+            )}
+          </Link>
         </div>
 
-        <div className="flex gap-2">
-          <Button variant="ghost" size="sm" className="flex-1 gap-2 text-xs" onClick={() => navigate('/profile')}>
-            <User className="h-3 w-3" />
-            Profile
-          </Button>
-          <Button variant="ghost" size="sm" className="flex-1 gap-2 text-xs" onClick={handleLogout}>
-            <LogOut className="h-3 w-3" />
-            Logout
-          </Button>
+        {/* User */}
+        <div className="border-t p-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-[9px] p-2 text-left transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-accent text-xs font-bold text-primary">
+                    {user?.name?.charAt(0)?.toUpperCase() ?? 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-bold">{user?.name ?? 'User'}</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">{user?.email}</span>
+                </span>
+                <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" side="top" className="w-56">
+              <DropdownMenuLabel className="font-normal">
+                <span className="block truncate text-sm font-bold">{user?.name}</span>
+                <span className="block truncate text-xs text-muted-foreground">{user?.email}</span>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate('/app/profile')}>
+                <UserIcon className="mr-2 h-4 w-4" /> Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/app/plans')}>
+                <CreditCard className="mr-2 h-4 w-4" /> Plans &amp; credits
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+                <LogOut className="mr-2 h-4 w-4" /> Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      </div>
-    </div>
+      </aside>
+    </>
   );
 };
 

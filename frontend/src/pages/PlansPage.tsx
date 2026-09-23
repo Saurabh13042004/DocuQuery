@@ -1,30 +1,31 @@
-import React, { useEffect, useState } from 'react';
-import { Check, Zap, Star, Crown, Users, ArrowRight, Coins } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowRight, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { PageContainer, PageHeader, SectionLabel, Skeleton } from '../components/app/ui';
 import { useAuth } from '../context/AuthContext';
-import { getPlans, upgradePlan, getCreditHistory } from '../services/api';
-import { PlansResponse, CreditTransaction } from '../types';
-import { PlanId } from '../types';
-
-const PLAN_ICONS: Record<string, React.ReactNode> = {
-  free: <Zap className="h-5 w-5" />,
-  starter: <Star className="h-5 w-5" />,
-  pro: <Crown className="h-5 w-5" />,
-  team: <Users className="h-5 w-5" />,
-};
+import { getPlans, upgradePlan, getCreditHistory, errorMessage, PlansResponse } from '../services/api';
+import { CreditTransaction, PlanId } from '../types';
 
 const PLAN_ORDER: PlanId[] = ['free', 'starter', 'pro', 'team'];
+const CREDIT_CAP: Record<PlanId, number> = { free: 20, starter: 500, pro: 2000, team: 1500 };
+const FEATURED: PlanId = 'starter';
 
 const REASON_LABELS: Record<string, string> = {
   signup_bonus: 'Signup bonus',
-  upload: 'Upload PDF',
-  ask: 'Q&A',
-  edit: 'PDF edit',
-  plan_upgrade_starter: 'Starter plan upgrade',
-  plan_upgrade_pro: 'Pro plan upgrade',
-  plan_upgrade_team: 'Team plan upgrade',
+  upload: 'Filed a PDF',
+  ask: 'Asked a question',
+  edit: 'Edited a PDF',
+  plan_upgrade_starter: 'Starter plan',
+  plan_upgrade_pro: 'Pro plan',
+  plan_upgrade_team: 'Team plan',
   team_seat: 'Team seat credits',
+};
+
+const COST_LABELS: Record<string, string> = {
+  upload: 'File & index a PDF',
+  ask: 'Ask a question',
+  edit: 'Edit a PDF',
 };
 
 export default function PlansPage() {
@@ -35,8 +36,8 @@ export default function PlansPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    getPlans().then(setPlansData).catch(console.error);
-    getCreditHistory().then(setHistory).catch(console.error);
+    getPlans().then(setPlansData).catch(() => setError('Couldn’t load plans. Refresh to try again.'));
+    getCreditHistory().then(setHistory).catch(() => {});
   }, []);
 
   const handleUpgrade = async (planId: PlanId) => {
@@ -49,171 +50,191 @@ export default function PlansPage() {
       const [fresh, freshHistory] = await Promise.all([getPlans(), getCreditHistory()]);
       setPlansData(fresh);
       setHistory(freshHistory);
-    } catch (e: any) {
-      setError(e?.response?.data?.detail || 'Upgrade failed. Please try again.');
+    } catch (e) {
+      setError(errorMessage(e, 'That didn’t go through. Please try again.'));
     } finally {
       setUpgrading(null);
     }
   };
 
-  if (!plansData) {
-    return (
-      <div className="flex items-center justify-center h-full p-8">
-        <div className="text-muted-foreground">Loading plans…</div>
-      </div>
-    );
-  }
+  const currentPlan = (user?.plan ?? 'free') as PlanId;
+  const credits = user?.credits ?? 0;
+  const pct = Math.min(100, Math.round((credits / CREDIT_CAP[currentPlan]) * 100));
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-10">
-
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Plans & Credits</h1>
-        <p className="text-muted-foreground mt-1">
-          You have <span className="font-semibold text-foreground">{user?.credits ?? 0} credits</span> remaining on the{' '}
-          <span className="font-semibold capitalize">{user?.plan}</span> plan.
-        </p>
-      </div>
-
-      {/* Credit costs reference */}
-      <div className="bg-muted/40 border border-border rounded-xl p-5">
-        <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-          <Coins className="h-4 w-4" /> Credit costs per operation
-        </h2>
-        <div className="grid grid-cols-3 gap-4 text-sm">
-          {Object.entries(plansData.costs).map(([op, cost]) => (
-            <div key={op} className="flex justify-between">
-              <span className="text-muted-foreground capitalize">{op}</span>
-              <Badge variant="outline">{cost} credit{cost !== 1 ? 's' : ''}</Badge>
-            </div>
-          ))}
-        </div>
-      </div>
+    <PageContainer wide>
+      <PageHeader
+        kicker="Membership"
+        title="Plans & credits"
+        description="Pay only if you file weekly. Credits are spent when you file, ask or edit."
+      />
 
       {error && (
-        <div className="bg-destructive/10 border border-destructive/30 text-destructive rounded-lg p-3 text-sm">
+        <div role="alert" className="mb-6 rounded-[9px] border border-destructive/25 bg-destructive/5 px-4 py-3 text-[13px] font-semibold text-destructive">
           {error}
         </div>
       )}
 
-      {/* Plan cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {PLAN_ORDER.map((planId) => {
-          const plan = plansData.plans[planId];
-          if (!plan) return null;
-          const isCurrent = user?.plan === planId;
-          const isUpgrade = PLAN_ORDER.indexOf(planId) > PLAN_ORDER.indexOf(user?.plan as PlanId ?? 'free');
-          const isDowngrade = PLAN_ORDER.indexOf(planId) < PLAN_ORDER.indexOf(user?.plan as PlanId ?? 'free');
-
-          return (
+      {/* Balance + tariff */}
+      <div className="mb-10 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+        <div className="animate-rise rounded-xl border bg-card p-5 sm:p-6">
+          <div className="kicker">Your balance</div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="font-mono text-4xl font-medium leading-none">{credits}</span>
+            <span className="font-mono text-sm text-muted-foreground">/ {CREDIT_CAP[currentPlan].toLocaleString()} credits</span>
+          </div>
+          <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#dbe8f9]">
             <div
-              key={planId}
-              className={`relative rounded-2xl border p-6 flex flex-col gap-4 transition-all ${
-                planId === 'pro'
-                  ? 'border-primary bg-primary/5 shadow-lg shadow-primary/10'
-                  : 'border-border bg-card'
-              }`}
-            >
-              {planId === 'pro' && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="bg-primary text-primary-foreground px-3">Most Popular</Badge>
+              className={cn('h-full rounded-full transition-[width] duration-700', pct <= 20 ? 'bg-destructive' : 'bg-primary')}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <p className="mt-3 text-sm text-muted-foreground">
+            On the <span className="font-bold capitalize text-foreground">{currentPlan}</span> plan.
+          </p>
+        </div>
+
+        <div className="animate-rise rounded-xl border bg-card p-5 sm:p-6" style={{ animationDelay: '60ms' }}>
+          <div className="kicker">Credit tariff</div>
+          <dl className="mt-3 grid gap-3 sm:grid-cols-3">
+            {plansData
+              ? Object.entries(plansData.costs).map(([op, cost]) => (
+                  <div key={op} className="rounded-[9px] bg-secondary px-3.5 py-3">
+                    <dt className="text-xs text-muted-foreground">{COST_LABELS[op] ?? op}</dt>
+                    <dd className="mt-1 font-mono text-lg font-medium">
+                      {cost} <span className="text-xs text-muted-foreground">cr</span>
+                    </dd>
+                  </div>
+                ))
+              : [0, 1, 2].map((i) => <Skeleton key={i} className="h-[62px]" />)}
+          </dl>
+        </div>
+      </div>
+
+      <SectionLabel left="Choose a plan" right="Change any time" />
+
+      {/* Plan cards */}
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {!plansData &&
+          [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-[420px] rounded-xl" />)}
+        {plansData &&
+          PLAN_ORDER.map((planId, i) => {
+            const plan = plansData.plans[planId];
+            if (!plan) return null;
+            const isCurrent = currentPlan === planId;
+            const rank = PLAN_ORDER.indexOf(planId) - PLAN_ORDER.indexOf(currentPlan);
+            const featured = planId === FEATURED;
+            const oneTime = plan.features.find((f) => /one-time/i.test(f));
+            // The credit allowance is already the card's headline, so don't repeat it in the list.
+            const features = plan.features.filter((f) => !/^[\d\s,]+(one-time\s+)?credits/i.test(f.trim()));
+
+            return (
+              <div
+                key={planId}
+                className={cn(
+                  'relative flex animate-rise flex-col rounded-xl border bg-card p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_45px_rgba(49,93,151,0.1)]',
+                  featured && 'border-2 border-primary p-[23px] shadow-[0_15px_35px_rgba(37,99,235,0.07)]',
+                  isCurrent && !featured && 'border-primary/50',
+                )}
+                style={{ animationDelay: `${i * 70}ms` }}
+              >
+                {featured && (
+                  <span className="absolute -top-3 right-5 rounded-full bg-primary px-2.5 py-1 font-mono text-[9px] tracking-wider text-primary-foreground">
+                    MOST FILED
+                  </span>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="kicker">{plan.name}</span>
+                  {isCurrent && (
+                    <span className="rounded-full bg-accent px-2 py-0.5 font-mono text-[9px] uppercase tracking-wide text-primary">
+                      Current
+                    </span>
+                  )}
                 </div>
-              )}
-
-              {/* Plan header */}
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${planId === 'pro' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                  {PLAN_ICONS[planId]}
+                <div className="mt-5 flex items-baseline gap-1.5">
+                  <span className="text-[38px] font-normal leading-none tracking-[-0.06em]">
+                    {plan.price_usd === 0 ? 'Free' : `$${plan.price_usd}`}
+                  </span>
+                  {plan.price_usd > 0 && <span className="text-[13px] text-muted-foreground">/ month</span>}
                 </div>
-                <div>
-                  <div className="font-semibold text-foreground">{plan.name}</div>
-                  <div className="text-xs text-muted-foreground">{plan.description}</div>
-                </div>
-              </div>
+                <p className="mt-2 min-h-[36px] text-[13px] text-muted-foreground">{plan.description}</p>
 
-              {/* Price */}
-              <div className="flex items-end gap-1">
-                <span className="text-3xl font-bold text-foreground">
-                  {plan.price_usd === 0 ? 'Free' : `$${plan.price_usd}`}
-                </span>
-                {plan.price_usd > 0 && <span className="text-muted-foreground text-sm mb-1">/month</span>}
-              </div>
+                <p className="mt-5 border-b pb-5 text-[13px] font-bold">
+                  {plan.monthly_credits > 0
+                    ? `${plan.monthly_credits.toLocaleString()} credits / month${planId === 'team' ? ' / seat' : ''}`
+                    : (oneTime?.replace(/\s*\(.*\)$/, '') ?? 'One-time credits')}
+                </p>
 
-              {/* Credits */}
-              <div className="text-sm text-muted-foreground">
-                {plan.monthly_credits > 0
-                  ? `${plan.monthly_credits.toLocaleString()} credits / month${planId === 'team' ? ' / seat' : ''}`
-                  : '50 credits one-time'}
-              </div>
+                <ul className="my-5 flex-1 space-y-3">
+                  {features.map((f) => (
+                    <li key={f} className="flex items-start gap-2.5 text-[13px] text-[#5b708b]">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" /> {f}
+                    </li>
+                  ))}
+                </ul>
 
-              {/* Features */}
-              <ul className="space-y-2 flex-1">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm text-foreground">
-                    <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-
-              {/* CTA */}
-              <div className="mt-2">
                 {isCurrent ? (
                   <Button variant="outline" className="w-full" disabled>
                     Current plan
                   </Button>
-                ) : isUpgrade ? (
+                ) : rank > 0 ? (
                   <Button
-                    className="w-full gap-2"
-                    variant={planId === 'pro' ? 'default' : 'outline'}
+                    className="w-full"
+                    variant={featured ? 'default' : 'outline'}
                     onClick={() => handleUpgrade(planId)}
-                    disabled={upgrading === planId}
+                    disabled={upgrading !== null}
                   >
-                    {upgrading === planId ? 'Upgrading…' : `Upgrade to ${plan.name}`}
-                    <ArrowRight className="h-4 w-4" />
+                    {upgrading === planId ? (
+                      <>
+                        <Loader2 className="animate-spin" /> Upgrading…
+                      </>
+                    ) : (
+                      <>
+                        Upgrade to {plan.name} <ArrowRight />
+                      </>
+                    )}
                   </Button>
-                ) : isDowngrade ? (
+                ) : (
                   <Button
                     variant="ghost"
-                    className="w-full text-muted-foreground"
+                    className="w-full"
                     onClick={() => handleUpgrade(planId)}
-                    disabled={upgrading === planId}
+                    disabled={upgrading !== null}
                   >
                     {upgrading === planId ? 'Switching…' : `Switch to ${plan.name}`}
                   </Button>
-                ) : null}
+                )}
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
       </div>
 
-      {/* Credit history */}
+      {/* History */}
       {history.length > 0 && (
-        <div>
-          <h2 className="text-lg font-semibold text-foreground mb-3">Credit History</h2>
-          <div className="border border-border rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40">
-                <tr>
-                  <th className="text-left px-4 py-3 text-muted-foreground font-medium">Operation</th>
-                  <th className="text-left px-4 py-3 text-muted-foreground font-medium">Date</th>
-                  <th className="text-right px-4 py-3 text-muted-foreground font-medium">Credits</th>
+        <div className="mt-14">
+          <SectionLabel left="Credit history" right={`Last ${history.length}`} />
+          <div className="overflow-x-auto rounded-xl border bg-card">
+            <table className="w-full min-w-[420px] text-sm">
+              <thead>
+                <tr className="border-b bg-secondary/60">
+                  <th className="kicker px-4 py-3 text-left font-medium">Operation</th>
+                  <th className="kicker px-4 py-3 text-left font-medium">Date</th>
+                  <th className="kicker px-4 py-3 text-right font-medium">Credits</th>
                 </tr>
               </thead>
               <tbody>
                 {history.map((tx) => (
-                  <tr key={tx.id} className="border-t border-border">
-                    <td className="px-4 py-3 text-foreground">
-                      {REASON_LABELS[tx.reason] ?? tx.reason}
-                    </td>
+                  <tr key={tx.id} className="border-b last:border-0 transition-colors hover:bg-secondary/40">
+                    <td className="px-4 py-3 font-bold">{REASON_LABELS[tx.reason] ?? tx.reason}</td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {new Date(tx.created_at).toLocaleDateString('en-US', {
-                        month: 'short', day: 'numeric', year: 'numeric',
-                      })}
+                      {new Date(tx.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                     </td>
-                    <td className={`px-4 py-3 text-right font-medium ${tx.amount > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    <td
+                      className={cn(
+                        'px-4 py-3 text-right font-mono font-medium',
+                        tx.amount > 0 ? 'text-success' : 'text-muted-foreground',
+                      )}
+                    >
                       {tx.amount > 0 ? `+${tx.amount}` : tx.amount}
                     </td>
                   </tr>
@@ -223,6 +244,6 @@ export default function PlansPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }
