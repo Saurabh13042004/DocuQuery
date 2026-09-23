@@ -4,8 +4,7 @@ import hashlib
 from collections import Counter
 from upstash_vector import Index, Vector
 from upstash_vector.types import SparseVector
-from google import genai
-from google.genai import types
+from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -15,10 +14,10 @@ _index = Index(
     token=os.environ["UPSTASH_VECTOR_REST_TOKEN"].strip('"')
 )
 
-_gemini = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+_openai = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
-EMBEDDING_MODEL = "gemini-embedding-001"
-OUTPUT_DIM = 768        # matches the Upstash vector index dimension
+EMBEDDING_MODEL = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+OUTPUT_DIM = 768        # matches the Upstash vector index dimension (text-embedding-3 can shorten its output)
 CHUNK_SIZE = 400        # words per chunk
 CHUNK_OVERLAP = 50      # word overlap between chunks
 TOP_K = 5               # top chunks to retrieve per query
@@ -62,12 +61,8 @@ def _compute_sparse(text: str) -> SparseVector:
 
 
 def _embed_batch(texts: list[str]) -> list[list[float]]:
-    result = _gemini.models.embed_content(
-        model=EMBEDDING_MODEL,
-        contents=texts,
-        config=types.EmbedContentConfig(output_dimensionality=OUTPUT_DIM)
-    )
-    return [e.values for e in result.embeddings]
+    result = _openai.embeddings.create(model=EMBEDDING_MODEL, input=texts, dimensions=OUTPUT_DIM)
+    return [d.embedding for d in result.data]
 
 
 def _embed_single(text: str) -> list[float]:

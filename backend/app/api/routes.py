@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, UploadFile, File, Form, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy import or_
@@ -8,7 +8,7 @@ from typing import List
 import jwt
 
 from .. import models, schemas, database
-from ..services import auth_service, pdf_service, vector_service, redis_service, credit_service, team_service
+from ..services import auth_service, pdf_service, vector_service, redis_service, credit_service, team_service, email_service, blob_service
 
 router = APIRouter()
 security = HTTPBearer()
@@ -61,6 +61,31 @@ async def login(user_credentials: schemas.UserLogin, db: Session = Depends(datab
         )
     token = auth_service.create_access_token(data={"sub": user.email})
     return {"access_token": token, "token_type": "bearer", "user": user}
+
+
+@router.post("/forgot-password", response_model=schemas.MessageOut)
+async def forgot_password(
+    body: schemas.ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(database.get_db),
+):
+    # Same response whether or not the account exists, so this can't be used to
+    # find out who has an account. Sending happens after the response for the
+    # same reason (no timing difference).
+    user = auth_service.get_user_by_email(db, body.email.strip())
+    if user and user.is_active:
+        token = auth_service.create_reset_token(user)
+        background_tasks.add_task(
+            email_service.send_password_reset_email,
+            user.email, user.name, token, auth_service.RESET_TOKEN_EXPIRE_MINUTES,
+        )
+    return {"message": "If an account exists for that email, a reset link is on its way."}
+
+
+@router.post("/reset-password", response_model=schemas.MessageOut)
+async def reset_password(body: schemas.ResetPasswordRequest, db: Session = Depends(database.get_db)):
+    auth_service.reset_password(db, body.token, body.password)
+    return {"message": "Password updated. You can sign in with your new password."}
 
 
 # ---------------------------------------------------------------------------
@@ -162,6 +187,27 @@ async def get_documents(
     )
 
 
+@router.get("/documents/{document_id}/file")
+async def get_document_file(
+    document_id: int,
+    edited: bool = False,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Stream the PDF (or its latest edited version) — storage is private, so access is checked here."""
+    document, _ = team_service.get_document(db, current_user, document_id)
+    path = (document.edited_file_path if edited else None) or document.file_path
+    try:
+        data = await pdf_service.read_file(path)
+    except (FileNotFoundError, OSError):
+        raise HTTPException(status_code=404, detail="File not found")
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={"Cache-Control": "private, no-store"},
+    )
+
+
 @router.delete("/documents/{document_id}")
 async def delete_document(
     document_id: int,
@@ -172,9 +218,17 @@ async def delete_document(
     if not team_service.can_delete(document, current_user, role):
         raise HTTPException(status_code=403, detail="You don't have permission to delete this document")
 
+    stored_files = [document.file_path, document.edited_file_path]
+    db.query(models.Comment).filter(models.Comment.document_id == document_id).delete()
     db.delete(document)
     db.commit()
     redis_service.clear_history(document_id)
+    for path in stored_files:
+        if blob_service.is_blob_key(path):
+            try:
+                await blob_service.delete(path)
+            except Exception:
+                pass  # the document is gone either way; an orphaned object is harmless
     return {"message": "Document deleted"}
 
 

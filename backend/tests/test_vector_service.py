@@ -130,7 +130,7 @@ def test_compute_sparse_repeated_word_higher_weight():
 # ── index_document and query_relevant_chunks (mocked) ────────────────────────
 
 @pytest.mark.asyncio
-async def test_index_document_empty_text_returns_zero(mock_vector_index, mock_vector_gemini):
+async def test_index_document_empty_text_returns_zero(mock_vector_index, mock_vector_openai):
     from app.services.vector_service import index_document
     count = await index_document(1, "")
     assert count == 0
@@ -138,7 +138,7 @@ async def test_index_document_empty_text_returns_zero(mock_vector_index, mock_ve
 
 
 @pytest.mark.asyncio
-async def test_index_document_upserts_chunks(mock_vector_index, mock_vector_gemini):
+async def test_index_document_upserts_chunks(mock_vector_index, mock_vector_openai):
     from app.services.vector_service import index_document
     text = " ".join(["word"] * 10)
     count = await index_document(42, text)
@@ -150,7 +150,7 @@ async def test_index_document_upserts_chunks(mock_vector_index, mock_vector_gemi
 
 
 @pytest.mark.asyncio
-async def test_query_relevant_chunks_returns_joined_text(mock_vector_index, mock_vector_gemini):
+async def test_query_relevant_chunks_returns_joined_text(mock_vector_index, mock_vector_openai):
     from app.services.vector_service import query_relevant_chunks
 
     r1 = MagicMock()
@@ -165,7 +165,7 @@ async def test_query_relevant_chunks_returns_joined_text(mock_vector_index, mock
 
 
 @pytest.mark.asyncio
-async def test_query_relevant_chunks_empty_returns_empty_string(mock_vector_index, mock_vector_gemini):
+async def test_query_relevant_chunks_empty_returns_empty_string(mock_vector_index, mock_vector_openai):
     from app.services.vector_service import query_relevant_chunks
     mock_vector_index.query.return_value = []
     result = await query_relevant_chunks(1, "anything")

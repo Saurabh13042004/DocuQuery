@@ -3,9 +3,7 @@ from app.api.routes import router
 from app.api.teams import router as teams_router
 from app.database import engine, Base
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
-import os
 
 app = FastAPI()
 
@@ -16,9 +14,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-os.makedirs("pdfs", exist_ok=True)
-app.mount("/pdfs", StaticFiles(directory="pdfs"), name="pdfs")
 
 
 @app.on_event("startup")

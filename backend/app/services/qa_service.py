@@ -1,11 +1,11 @@
 import os
 from dotenv import load_dotenv
-from google import genai
+from openai import OpenAI
 
 load_dotenv()
 
-client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-MODEL = "gemini-2.5-flash"
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+MODEL = os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini")
 
 
 async def answer_question(question: str, pdf_text: str):
@@ -16,8 +16,8 @@ async def answer_question(question: str, pdf_text: str):
     )
 
     try:
-        response = client.models.generate_content(model=MODEL, contents=prompt)
-        return response.text.strip()
+        response = client.chat.completions.create(model=MODEL, messages=[{"role": "user", "content": prompt}])
+        return response.choices[0].message.content.strip()
     except Exception as e:
         print("Exception occurred:", str(e))
         return "An error occurred while processing your request."

@@ -8,13 +8,10 @@ import os
 
 # ── env vars first, before any app import ───────────────────────────────────
 os.environ["DATABASE_URL"] = "sqlite:///./test_docuquery.db"
-os.environ["GEMINI_API_KEY"] = "test-gemini-key"
+os.environ["OPENAI_API_KEY"] = "test-openai-key"
 os.environ["SECRET_KEY"] = "test-secret-key-32-chars-minimum!"
 os.environ["ENVIRONMENT"] = "development"
-os.environ["AWS_ACCESS_KEY"] = "test-aws-key"
-os.environ["AWS_SECRET_KEY"] = "test-aws-secret"
-os.environ["AWS_REGION"] = "us-east-1"
-os.environ["AWS_BUCKET_NAME"] = "test-bucket"
+os.environ["UPSTASH_BLOB_TOKEN"] = "test-blob-token"
 os.environ["UPSTASH_REDIS_REST_URL"] = "https://test-redis.upstash.io"
 os.environ["UPSTASH_REDIS_REST_TOKEN"] = "test-redis-token"
 os.environ["UPSTASH_VECTOR_REST_URL"] = "https://test-vector.upstash.io"
@@ -89,13 +86,11 @@ def mock_vector_index():
 
 
 @pytest.fixture
-def mock_vector_gemini():
-    with patch("app.services.vector_service._gemini") as m:
-        embedding = MagicMock()
-        embedding.values = [0.1] * 768
-        result = MagicMock()
-        result.embeddings = [embedding]
-        m.models.embed_content.return_value = result
+def mock_vector_openai():
+    with patch("app.services.vector_service._openai") as m:
+        item = MagicMock()
+        item.embedding = [0.1] * 768
+        m.embeddings.create.return_value = MagicMock(data=[item])
         yield m
 
 
@@ -106,14 +101,16 @@ def mock_pdf_client():
 
 
 @pytest.fixture
-def mock_s3():
-    with patch("app.services.pdf_service.s3_client") as m:
+def mock_blob():
+    """Blob storage: (s3 client mock, bucket) so no request leaves the process."""
+    with patch("app.services.blob_service._s3") as m:
+        m.return_value = (MagicMock(), "test-bucket")
         yield m
 
 
 # ── TestClient with dependency override ─────────────────────────────────────
 @pytest.fixture
-def client(mock_redis, mock_vector_index, mock_vector_gemini, mock_pdf_client, mock_s3):
+def client(mock_redis, mock_vector_index, mock_vector_openai, mock_pdf_client, mock_blob):
     app.dependency_overrides[app_database.get_db] = override_get_db
     with TestClient(app) as c:
         yield c

@@ -102,14 +102,14 @@ def test_viewer_can_chat_but_edit_is_blocked(client):
     from unittest.mock import MagicMock
     _, owner, m = make_team(client)
     doc = upload(client, owner).json()
-    fc = MagicMock()
-    fc.name, fc.args = "edit_pdf", {"original_text": "a", "new_text": "b"}
-    resp = MagicMock(function_calls=[fc], text=None)
+    tc = MagicMock()
+    tc.function.name, tc.function.arguments = "edit_pdf", '{"original_text": "a", "new_text": "b"}'
+    resp = MagicMock(choices=[MagicMock(message=MagicMock(tool_calls=[tc], content=None))])
     with patch("app.services.pdf_service._client") as c, \
          patch("app.services.pdf_service.extract_text_from_pdf", new_callable=AsyncMock, return_value="a"), \
          patch("app.services.vector_service.query_relevant_chunks", new_callable=AsyncMock,
                return_value={"context": "a", "pages": []}):
-        c.models.generate_content.return_value = resp
+        c.chat.completions.create.return_value = resp
         r = client.post("/ask", headers=m["viewer"], json={"id": doc["id"], "question": "change a to b"})
     assert r.status_code == 200 and r.json()["is_edit"] is False and "view-only" in r.json()["answer"]
 

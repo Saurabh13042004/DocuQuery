@@ -3,7 +3,7 @@ import io
 import os
 import pytest
 import pymupdf as fitz
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services.pdf_service import (
     _detect_font_style,
@@ -213,76 +213,100 @@ def test_extract_embedded_font_strips_subset_prefix():
 
 # ── _perform_pdf_edit ─────────────────────────────────────────────────────────
 
+@pytest.fixture
+def blob_put():
+    """Edited PDFs are written to Blob; capture the upload instead of hitting the network."""
+    with patch("app.services.blob_service.put", new_callable=AsyncMock) as m:
+        yield m
+
+
 @pytest.mark.asyncio
-async def test_perform_pdf_edit_text_not_found(tmp_path):
+async def test_perform_pdf_edit_text_not_found(tmp_path, blob_put):
     pdf_path = make_pdf_with_text("Hello World", tmp_path)
     result = await _perform_pdf_edit(pdf_path, "NONEXISTENT", "replacement")
     assert result["success"] is False
     assert "NONEXISTENT" in result["message"]
+    blob_put.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_perform_pdf_edit_text_found_returns_success(tmp_path):
+async def test_perform_pdf_edit_text_found_returns_success(tmp_path, blob_put):
     pdf_path = make_pdf_with_text("Hello Saurabh World", tmp_path)
-    os.makedirs(tmp_path / "pdfs", exist_ok=True)
-
-    with patch("app.services.pdf_service.os.makedirs"), \
-         patch("app.services.pdf_service.datetime") as mock_dt:
-        mock_dt.now.return_value.strftime.return_value = "20260101120000"
-
-        # Redirect save path to tmp_path
-        with patch.object(fitz.Document, "save", lambda self, p: self.save(str(tmp_path / "out.pdf"))):
-            result = await _perform_pdf_edit(pdf_path, "Saurabh", "Rishabh")
-
+    result = await _perform_pdf_edit(pdf_path, "Saurabh", "Rishabh")
     assert result["success"] is True
-    assert "editedPdfUrl" in result
+    assert result["edited_file_path"].startswith("docs/edited_")
+    blob_put.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_perform_pdf_edit_case_insensitive_search(tmp_path):
+async def test_perform_pdf_edit_case_insensitive_search(tmp_path, blob_put):
     pdf_path = make_pdf_with_text("hello SAURABH world", tmp_path)
-
-    with patch("app.services.pdf_service.os.makedirs"), \
-         patch("app.services.pdf_service.datetime") as mock_dt:
-        mock_dt.now.return_value.strftime.return_value = "20260101120001"
-        result = await _perform_pdf_edit(pdf_path, "saurabh", "rishabh")
-
+    result = await _perform_pdf_edit(pdf_path, "saurabh", "rishabh")
     assert result["success"] is True
 
 
 @pytest.mark.asyncio
-async def test_perform_pdf_edit_uppercase_preserved(tmp_path):
+async def test_perform_pdf_edit_uppercase_preserved(tmp_path, blob_put):
     """If the original text is uppercase in the PDF, the replacement should be too."""
     pdf_path = make_pdf_with_text("HELLO SAURABH WORLD", tmp_path)
-
-    with patch("app.services.pdf_service.os.makedirs"), \
-         patch("app.services.pdf_service.datetime") as mock_dt:
-        mock_dt.now.return_value.strftime.return_value = "20260101120002"
-        result = await _perform_pdf_edit(pdf_path, "SAURABH", "rishabh")
-
+    result = await _perform_pdf_edit(pdf_path, "SAURABH", "rishabh")
     # Function should complete successfully; case logic converts "rishabh" → "RISHABH"
     assert result["success"] is True
 
 
 @pytest.mark.asyncio
-async def test_perform_pdf_edit_output_file_has_new_text(tmp_path):
-    """The edited PDF should contain the replacement text."""
+async def test_perform_pdf_edit_uploaded_bytes_have_new_text(tmp_path, blob_put):
+    """The PDF uploaded to Blob should contain the replacement text."""
     pdf_path = make_pdf_with_text("Name: Saurabh Shukla", tmp_path)
-
-    with patch("app.services.pdf_service.os.makedirs"):
-        with patch("app.services.pdf_service.datetime") as mock_dt:
-            mock_dt.now.return_value.strftime.return_value = "20260101120003"
-            result = await _perform_pdf_edit(pdf_path, "Saurabh", "Rishabh")
+    result = await _perform_pdf_edit(pdf_path, "Saurabh", "Rishabh")
 
     assert result["success"] is True
-    edited_path = result["edited_file_path"]
-    assert os.path.exists(edited_path)
+    key, data = blob_put.await_args.args[:2]
+    assert key == result["edited_file_path"]
 
-    # Verify the new text appears in the edited PDF
-    doc = fitz.open(edited_path)
+    doc = fitz.open(stream=data, filetype="pdf")
     page_text = doc[0].get_text()
     doc.close()
     assert "Rishabh" in page_text
     assert "Saurabh" not in page_text
 
-    os.unlink(edited_path)
+
+# ── process_user_input (OpenAI tool calling) ─────────────────────────────────
+
+def _tool_completion(name, args):
+    import json
+    from unittest.mock import MagicMock
+    tc = MagicMock()
+    tc.function.name, tc.function.arguments = name, json.dumps(args)
+    return MagicMock(choices=[MagicMock(message=MagicMock(tool_calls=[tc], content=None))])
+
+
+@pytest.mark.asyncio
+async def test_process_user_input_answer_uses_tool_call(mock_redis):
+    from unittest.mock import AsyncMock, patch
+    from app.services import pdf_service
+    with patch("app.services.vector_service.query_relevant_chunks", new_callable=AsyncMock,
+               return_value={"context": "[Page 2]\nnotice is 30 days", "pages": [2]}), \
+         patch.object(pdf_service, "_client") as c:
+        c.chat.completions.create.return_value = _tool_completion("answer_question", {"response": "30 days (page 2)"})
+        result = await pdf_service.process_user_input("notice period?", "text", "x.pdf")
+    kwargs = c.chat.completions.create.call_args.kwargs
+    assert kwargs["tool_choice"] == "required" and kwargs["messages"][0]["role"] == "system"
+    assert result == {"answer": "30 days (page 2)", "is_edit": False, "citations": ["2"]}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("code,expected", [("insufficient_quota", "out of quota"), (None, "rate-limited")])
+async def test_process_user_input_rate_limit_messages(mock_redis, code, expected):
+    import httpx
+    from openai import RateLimitError
+    from unittest.mock import AsyncMock, patch
+    from app.services import pdf_service
+    resp = httpx.Response(429, request=httpx.Request("POST", "http://x"))
+    err = RateLimitError("limit", response=resp, body={"code": code})
+    with patch("app.services.vector_service.query_relevant_chunks", new_callable=AsyncMock,
+               return_value={"context": "c", "pages": []}), \
+         patch.object(pdf_service, "_client") as c:
+        c.chat.completions.create.side_effect = err
+        result = await pdf_service.process_user_input("q", "text", "x.pdf")
+    assert expected in result["answer"] and result["is_edit"] is False
