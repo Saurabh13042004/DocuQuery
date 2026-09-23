@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 from datetime import datetime
-from pathlib import Path
 
 from . import redis_service, vector_service
 
@@ -94,116 +93,17 @@ _PDF_TOOLS = types.Tool(
 )
 
 # ---------------------------------------------------------------------------
-# Font detection — uses PyMuPDF flags bitmask, no hardcoded map
+# Font helpers + the text-replacement engine live in pdf_editor (PyMuPDF only,
+# so they can be tested without the API clients above).
 # ---------------------------------------------------------------------------
 
-def _detect_font_style(span: dict) -> tuple[str, bool, bool]:
-    """
-    Read bold/italic from PyMuPDF's flags bitmask.
-    bit 1 (2)  = italic
-    bit 4 (16) = bold
-    """
-    flags = span.get("flags", 0)
-    font_name = span.get("font", "")
-    is_bold = bool(flags & 16)
-    is_italic = bool(flags & 2)
-    return font_name, is_bold, is_italic
-
-
-def _resolve_font(font_name: str, is_bold: bool, is_italic: bool) -> str:
-    """
-    Dynamically resolve the best available font for text insertion.
-    Tests real availability via fitz.Font() instead of a static lookup map.
-    """
-    # Try the original font name and common variants
-    candidates = [font_name]
-    if font_name:
-        candidates += [
-            font_name.replace(" ", ""),
-            font_name.split("-")[0],
-        ]
-
-    for name in candidates:
-        if not name:
-            continue
-        try:
-            fitz.Font(name)
-            return name
-        except Exception:
-            pass
-
-    # Fall back to standard PDF core fonts based on detected style flags
-    if is_bold and is_italic:
-        return "Helvetica-BoldOblique"
-    elif is_bold:
-        return "Helvetica-Bold"
-    elif is_italic:
-        return "Helvetica-Oblique"
-    return "Helvetica"
-
-
-def _color_to_rgb(color_val) -> tuple:
-    if isinstance(color_val, int):
-        if color_val == 0:
-            return (0, 0, 0)
-        r = (color_val >> 16) & 0xff
-        g = (color_val >> 8) & 0xff
-        b = color_val & 0xff
-        return (r / 255, g / 255, b / 255)
-    return color_val if color_val else (0, 0, 0)
-
-
-def _extract_embedded_font(doc: fitz.Document, page: fitz.Page, font_name: str):
-    """Extract an embedded font from the PDF by matching font name. Returns fitz.Font or None."""
-    if not font_name:
-        return None
-    # Normalise: strip subset prefix "ABCDEF+FontName" -> "FontName" and lowercase for comparison
-    def _norm(n: str) -> str:
-        return n.split("+")[-1].lower() if n else ""
-
-    target = _norm(font_name)
-    try:
-        page_fonts = doc.get_page_fonts(page.number, full=True)
-        print(f"[font] looking for '{font_name}' (norm='{target}') among {[(_norm(f[3]), _norm(f[4])) for f in page_fonts]}")
-        for f in page_fonts:
-            xref, _ext, _ftype, basefont, alias, _enc, _ref = f
-            if target in (_norm(basefont), _norm(alias)):
-                extracted = doc.extract_font(xref)
-                font_buffer = extracted[3]
-                if font_buffer and len(font_buffer) > 0:
-                    print(f"[font] embedded font found for '{font_name}' (xref={xref})")
-                    return fitz.Font(fontbuffer=font_buffer)
-                print(f"[font] xref={xref} matched but no buffer (type={extracted[2]})")
-    except Exception as e:
-        print(f"[font] extraction error: {e}")
-    print(f"[font] no embedded font for '{font_name}', using fallback")
-    return None
-
-# ---------------------------------------------------------------------------
-# Custom font registration (DejaVu fonts shipped with repo)
-# ---------------------------------------------------------------------------
-
-def _register_custom_fonts():
-    try:
-        fonts_dir = Path(__file__).parent.parent.parent / "fonts"
-        mappings = {
-            'DejaVuSerifCondensed': 'DejaVuSerifCondensed.ttf',
-            'DejaVuSerifCondensed-Bold': 'DejaVuSerifCondensed-Bold.ttf',
-            'DejaVuSerifCondensed-BoldItalic': 'DejaVuSerifCondensed-BoldItalic.ttf',
-            'DejaVuSerifCondensed-Italic': 'DejaVuSerifCondensed-Italic.ttf',
-        }
-        for name, filename in mappings.items():
-            path = fonts_dir / filename
-            if path.exists():
-                try:
-                    fitz.Font(name, str(path))
-                except Exception:
-                    pass
-    except Exception:
-        pass
-
-
-_register_custom_fonts()
+from . import pdf_editor
+from .pdf_editor import (  # noqa: F401  (re-exported for callers/tests)
+    _color_to_rgb,
+    _detect_font_style,
+    _extract_embedded_font,
+    _resolve_font,
+)
 
 # ---------------------------------------------------------------------------
 # PDF file I/O
@@ -270,107 +170,27 @@ async def extract_pages(file_path: str) -> list[str]:
 
 async def _perform_pdf_edit(file_path: str, original_text: str, new_text: str) -> dict:
     local_path, is_tmp = await _resolve_local(file_path)
+    try:
+        doc = fitz.open(local_path)
+        try:
+            report = pdf_editor.replace_text(doc, original_text, new_text)
+            if not report.replacements:
+                return {"success": False, "message": f"Could not find '{original_text}' in the document."}
 
-    doc = fitz.open(local_path)
-    changes_made = False
-
-    for page in doc:
-        # "dict" mode gives span["text"], span["font"], span["size"], span["origin"] — all we need
-        blocks = page.get_text("dict")["blocks"]
-
-        for block in blocks:
-            if block.get("type") != 0:
-                continue
-            for line in block.get("lines", []):
-                for span in line.get("spans", []):
-                    span_text = span.get("text", "")
-
-                    if original_text.lower() not in span_text.lower():
-                        continue
-
-                    print(f"[edit] MATCH span_text='{span_text}' | looking for='{original_text}'")
-
-                    # Preserve case of whatever is in the PDF
-                    idx = span_text.lower().index(original_text.lower())
-                    actual = span_text[idx:idx + len(original_text)]
-                    if actual.isupper():
-                        display_new = new_text.upper()
-                    elif actual.istitle():
-                        display_new = new_text.capitalize()
-                    else:
-                        display_new = new_text
-
-                    # Replace within the FULL span so the rest of the span text is preserved
-                    modified_text = span_text[:idx] + display_new + span_text[idx + len(original_text):]
-                    print(f"[edit] modified_text='{modified_text}'")
-
-                    font_name, is_bold, is_italic = _detect_font_style(span)
-                    font_size = span.get("size", 12)
-                    rgb_color = _color_to_rgb(span.get("color", 0))
-                    bbox = fitz.Rect(span["bbox"])
-
-                    # rawdict gives us the exact baseline origin — no approximation needed
-                    origin = span.get("origin")
-                    if origin:
-                        baseline_point = fitz.Point(origin[0], origin[1])
-                    else:
-                        baseline_point = fitz.Point(bbox.x0, bbox.y1 - font_size * 0.15)
-
-                    print(f"[edit] font='{font_name}' bold={is_bold} italic={is_italic} size={font_size} color={rgb_color}")
-                    print(f"[edit] bbox={tuple(bbox)} origin={origin} baseline={tuple(baseline_point)}")
-
-                    # Cover old span with white
-                    page.draw_rect(bbox, color=None, fill=(1, 1, 1))
-
-                    # Try embedded font first; fall back to best available standard font
-                    embedded = _extract_embedded_font(doc, page, font_name)
-                    try:
-                        if embedded:
-                            print(f"[edit] inserting with EMBEDDED font")
-                            tw = fitz.TextWriter(page.rect)
-                            tw.append(baseline_point, modified_text, font=embedded, fontsize=font_size)
-                            tw.write_text(page, color=rgb_color)
-                        else:
-                            fallback = _resolve_font(font_name, is_bold, is_italic)
-                            print(f"[edit] inserting with FALLBACK font='{fallback}'")
-                            page.insert_text(
-                                baseline_point, modified_text,
-                                fontname=fallback,
-                                fontsize=font_size,
-                                color=rgb_color
-                            )
-                        changes_made = True
-                        print(f"[edit] SUCCESS")
-                    except Exception as e:
-                        print(f"[edit] WARNING insert failed: {e} — retrying with default font")
-                        try:
-                            page.insert_text(baseline_point, modified_text, fontsize=font_size, color=rgb_color)
-                            changes_made = True
-                        except Exception as e2:
-                            print(f"[edit] ERROR all insert attempts failed: {e2}")
-
-    if not changes_made:
+            edited_key = blob_service.new_key("edited_")
+            await blob_service.put(edited_key, doc.tobytes())
+        finally:
+            doc.close()
+    finally:
         if is_tmp:
             os.unlink(local_path)
-        doc.close()
-        return {"success": False, "message": f"Could not find '{original_text}' in the document."}
-
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    base_name = os.path.basename(file_path) if not file_path.startswith("http") else file_path.split("/")[-1]
-    new_file_name = f"edited_{timestamp}_{base_name}"
-
-    os.makedirs('pdfs', exist_ok=True)
-    edited_path = f"pdfs/{new_file_name}"
-    doc.save(edited_path)
-    doc.close()
-
-    if is_tmp:
-        os.unlink(local_path)
 
     return {
         "success": True,
-        "editedPdfUrl": f"/pdfs/{new_file_name}",
-        "edited_file_path": edited_path,
+        "edited_file_path": edited_key,
+        "replacements": report.replacements,
+        "pages": report.pages,
+        "warnings": report.warnings,
     }
 
 # ---------------------------------------------------------------------------
@@ -478,7 +298,12 @@ async def process_user_input(
                 if document and db:
                     document.edited_file_path = edit_result["edited_file_path"]
                     db.commit()
-                answer = f"Done! Changed \"{original_text}\" → \"{new_text}\". You can download the updated PDF."
+                n = edit_result.get("replacements", 1)
+                answer = f"Done! Changed \"{original_text}\" → \"{new_text}\""
+                answer += f" in {n} places." if n > 1 else "."
+                answer += " You can download the updated PDF."
+                if edit_result.get("warnings"):
+                    answer += "\n\nHeads up:\n" + "\n".join(f"- {w}" for w in edit_result["warnings"])
                 redis_service.add_message(document_id, "user", question)
                 redis_service.add_message(document_id, "assistant", answer)
                 result = {
