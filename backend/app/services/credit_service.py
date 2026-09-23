@@ -56,6 +56,21 @@ PLANS: dict = {
             "API access",
         ],
     },
+    "team": {
+        "name": "Team",
+        "price_usd": 79,
+        "monthly_credits": 1500,
+        "seats": 5,
+        "badge_color": "default",
+        "description": "For teams collaborating on documents",
+        "features": [
+            "5 seats, 1 500 credits / seat",
+            "Shared document library",
+            "Roles: Admin / Editor / Viewer",
+            "Team usage dashboard",
+            "Shared prompts & comments",
+        ],
+    },
 }
 
 

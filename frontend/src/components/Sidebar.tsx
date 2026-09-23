@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   FileText, Upload, Clock, Star, Folder, MessageSquare,
-  Trash2, Settings, User, LogOut, Home, Cloud, Zap, CreditCard, Crown,
+  Trash2, Settings, User, LogOut, Home, Cloud, Zap, CreditCard, Crown, Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -19,12 +19,13 @@ const PLAN_BADGE: Record<PlanId, { label: string; className: string }> = {
   free: { label: 'Free', className: 'bg-muted text-muted-foreground border-border' },
   starter: { label: 'Starter', className: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400' },
   pro: { label: 'Pro', className: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400' },
+  team: { label: 'Team', className: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400' },
 };
 
 const Sidebar: React.FC<SidebarProps> = ({ onUploadClick }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, team } = useAuth();
 
   const handleLogout = () => { logout(); navigate('/'); };
   const isActive = (path: string) => location.pathname === path;
@@ -34,6 +35,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onUploadClick }) => {
     { icon: Clock, label: 'Recent', path: '/app/recent' },
     { icon: Star, label: 'Starred', path: '/app/starred' },
     { icon: Folder, label: 'Folders', path: '/app/folders' },
+    { icon: Users, label: 'Team', path: '/app/team' },
     { icon: Cloud, label: 'Integrations', path: '/app/integrations' },
   ];
 
@@ -49,7 +51,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onUploadClick }) => {
   const planBadge = PLAN_BADGE[plan];
 
   // credit bar: cap at whichever monthly limit makes sense for display
-  const creditCap = plan === 'pro' ? 2000 : plan === 'starter' ? 500 : 20;
+  const creditCap = plan === 'team' ? 1500 : plan === 'pro' ? 2000 : plan === 'starter' ? 500 : 20;
   const barPct = Math.min(100, Math.round((credits / creditCap) * 100));
 
   return (
@@ -65,12 +67,14 @@ const Sidebar: React.FC<SidebarProps> = ({ onUploadClick }) => {
       </div>
 
       {/* Upload */}
-      <div className="p-4">
-        <Button onClick={onUploadClick} className="w-full gap-2" size="default">
-          <Upload className="h-4 w-4" />
-          Upload PDF
-        </Button>
-      </div>
+      {team?.role !== 'viewer' && (
+        <div className="p-4">
+          <Button onClick={onUploadClick} className="w-full gap-2" size="default">
+            <Upload className="h-4 w-4" />
+            Upload PDF
+          </Button>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 px-3 overflow-y-auto">

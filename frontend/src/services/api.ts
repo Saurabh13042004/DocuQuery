@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { PlanId, PlanInfo, CreditTransaction } from '../types';
+import { PlanId, PlanInfo, CreditTransaction, TeamInfo, PendingInvite, TeamRole, MemberUsage, TeamPrompt, CommentType } from '../types';
 
 const API_URL = 'http://127.0.0.1:8000';
 
@@ -46,6 +46,7 @@ export interface DocumentResponse {
   filename: string;
   file_path: string;
   upload_date: string;
+  team_id?: number | null;
 }
 
 export interface MessageResponse {
@@ -119,9 +120,10 @@ export const getCreditHistory = async (): Promise<CreditTransaction[]> => {
 
 // ── documents ──────────────────────────────────────────────────────────────
 
-export const uploadPDF = async (file: File): Promise<DocumentResponse> => {
+export const uploadPDF = async (file: File, shared = false): Promise<DocumentResponse> => {
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('shared', String(shared));
   const response = await api.post<DocumentResponse>('/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
@@ -171,3 +173,46 @@ export const exportChat = async (documentId: number, format: 'md' | 'txt' = 'md'
   window.document.body.removeChild(a);
   URL.revokeObjectURL(url);
 };
+
+// ── teams ──────────────────────────────────────────────────────────────────
+
+export const getMyTeam = async (): Promise<{ team: TeamInfo | null; pending_invites: PendingInvite[] }> =>
+  (await api.get('/teams/me')).data;
+
+export const createTeam = async (name: string) => (await api.post('/teams', { name })).data;
+
+export const inviteMember = async (teamId: number, email: string, role: TeamRole) =>
+  (await api.post(`/teams/${teamId}/invite`, { email, role })).data;
+
+export const acceptInvite = async (inviteId: number) => api.post(`/teams/invites/${inviteId}/accept`);
+
+export const cancelInvite = async (inviteId: number) => api.delete(`/teams/invites/${inviteId}`);
+
+export const changeMemberRole = async (teamId: number, userId: number, role: TeamRole) =>
+  api.patch(`/teams/${teamId}/members/${userId}`, { role });
+
+export const removeMember = async (teamId: number, userId: number) =>
+  api.delete(`/teams/${teamId}/members/${userId}`);
+
+export const getTeamUsage = async (teamId: number): Promise<MemberUsage[]> =>
+  (await api.get(`/teams/${teamId}/usage`)).data.members;
+
+export const getTeamPrompts = async (teamId: number): Promise<TeamPrompt[]> =>
+  (await api.get(`/teams/${teamId}/prompts`)).data;
+
+export const addTeamPrompt = async (teamId: number, title: string, prompt: string, category: string): Promise<TeamPrompt> =>
+  (await api.post(`/teams/${teamId}/prompts`, { title, prompt, category })).data;
+
+export const deleteTeamPrompt = async (teamId: number, promptId: number) =>
+  api.delete(`/teams/${teamId}/prompts/${promptId}`);
+
+// ── comments ───────────────────────────────────────────────────────────────
+
+export const getComments = async (documentId: number): Promise<CommentType[]> =>
+  (await api.get(`/documents/${documentId}/comments`)).data;
+
+export const addComment = async (documentId: number, content: string, page?: number): Promise<CommentType> =>
+  (await api.post(`/documents/${documentId}/comments`, { content, page })).data;
+
+export const toggleComment = async (commentId: number): Promise<CommentType> =>
+  (await api.patch(`/comments/${commentId}/resolve`)).data;

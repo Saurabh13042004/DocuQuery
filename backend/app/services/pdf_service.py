@@ -382,7 +382,8 @@ async def process_user_input(
     pdf_text: str,
     file_path: str,
     document=None,
-    db=None
+    db=None,
+    allow_edit: bool = True,
 ) -> dict:
     document_id = document.id if document else 0
 
@@ -462,6 +463,10 @@ async def process_user_input(
             redis_service.add_message(document_id, "user", question)
             redis_service.add_message(document_id, "assistant", answer)
             result = {"answer": answer, "is_edit": False, "citations": [str(p) for p in source_pages]}
+
+        elif func.name == "edit_pdf" and not allow_edit:
+            answer = "You have view-only access to this document, so I can't edit it."
+            result = {"answer": answer, "is_edit": False}
 
         elif func.name == "edit_pdf":
             original_text = func.args.get("original_text", "")

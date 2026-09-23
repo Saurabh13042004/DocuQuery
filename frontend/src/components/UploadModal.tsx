@@ -10,11 +10,12 @@ interface UploadModalProps {
 
 const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
   const { addDocument, fetchUserDocuments } = usePdf();
-  const { refreshUser } = useAuth();
+  const { refreshUser, team } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [shared, setShared] = useState(true);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -69,7 +70,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
     setError(null);
     
     try {
-      await uploadPDF(file);
+      await uploadPDF(file, !!team && shared);
       await fetchUserDocuments();
       refreshUser().catch(() => {}); // update sidebar credit count
       setIsUploading(false);
@@ -154,6 +155,13 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
             )}
           </div>
           
+          {team && (
+            <label className="mt-4 flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={shared} onChange={(e) => setShared(e.target.checked)} />
+              Share with {team.name}
+            </label>
+          )}
+
           {error && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md flex items-start">
               <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" />

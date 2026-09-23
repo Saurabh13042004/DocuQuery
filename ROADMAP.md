@@ -36,16 +36,16 @@
 *Target: Month 1–2 | Unlocks biggest revenue jump*
 
 ### Team Workspaces
-- [ ] Invite teammates by email
-- [ ] Shared document library (team can see each other's PDFs)
-- [ ] Role-based access — Viewer / Editor / Admin
-- [ ] Team usage dashboard (credits used, docs uploaded, top users)
-- [ ] Team plan billing ($79/month, 5 seats, 1500 credits/seat)
+- [x] Invite teammates by email
+- [x] Shared document library (team can see each other's PDFs)
+- [x] Role-based access — Viewer / Editor / Admin
+- [x] Team usage dashboard (credits used, docs uploaded, top users)
+- [x] Team plan billing ($79/month, 5 seats, 1500 credits/seat)
 
 ### Collaboration
-- [ ] Comments and annotations on PDF pages
+- [x] Comments and annotations on PDF pages
 - [ ] @mention teammates in chat
-- [ ] Shared saved prompts across team
+- [x] Shared saved prompts across team
 
 ---
 

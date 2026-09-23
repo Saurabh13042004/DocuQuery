@@ -1,13 +1,14 @@
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Query, status
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from typing import List
 import jwt
 
 from .. import models, schemas, database
-from ..services import auth_service, pdf_service, vector_service, redis_service, credit_service
+from ..services import auth_service, pdf_service, vector_service, redis_service, credit_service, team_service
 
 router = APIRouter()
 security = HTTPBearer()
@@ -113,9 +114,16 @@ async def credit_history(
 @router.post("/upload", response_model=schemas.DocumentResponse)
 async def upload_pdf(
     file: UploadFile = File(...),
+    shared: bool = Form(False),
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    member = team_service.get_membership(db, current_user)
+    if member and member.role not in team_service.CAN_EDIT:
+        raise HTTPException(status_code=403, detail="Viewers can't upload documents")
+    if shared and not member:
+        raise HTTPException(status_code=400, detail="Join a team to share documents")
+
     # Deduct 2 credits before doing any work
     credit_service.check_and_deduct(db, current_user, "upload")
 
@@ -126,6 +134,7 @@ async def upload_pdf(
         file_path=file_location,
         upload_date=datetime.now(timezone.utc),
         user_id=current_user.id,
+        team_id=member.team_id if shared else None,
     )
     db.add(db_document)
     db.commit()
@@ -143,9 +152,11 @@ async def get_documents(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    member = team_service.get_membership(db, current_user)
+    mine = (models.Document.user_id == current_user.id) & models.Document.team_id.is_(None)
     return (
         db.query(models.Document)
-        .filter(models.Document.user_id == current_user.id)
+        .filter(or_(mine, models.Document.team_id == member.team_id) if member else mine)
         .order_by(models.Document.upload_date.desc())
         .all()
     )
@@ -157,13 +168,9 @@ async def delete_document(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    document = db.query(models.Document).filter(
-        models.Document.id == document_id,
-        models.Document.user_id == current_user.id,
-    ).first()
-
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    document, role = team_service.get_document(db, current_user, document_id)
+    if not team_service.can_delete(document, current_user, role):
+        raise HTTPException(status_code=403, detail="You don't have permission to delete this document")
 
     db.delete(document)
     db.commit()
@@ -177,13 +184,7 @@ async def ask_question(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    document = db.query(models.Document).filter(
-        models.Document.id == question_request.id,
-        models.Document.user_id == current_user.id,
-    ).first()
-
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    document, role = team_service.get_document(db, current_user, question_request.id)
 
     # Deduct 1 credit upfront (minimum for any question)
     credit_service.check_and_deduct(db, current_user, "ask")
@@ -197,6 +198,7 @@ async def ask_question(
         current_file_path,
         document,
         db,
+        allow_edit=role in team_service.CAN_EDIT,
     )
 
     # Edits cost 1 extra credit (total 2) on top of the base ask credit
@@ -223,13 +225,7 @@ async def add_message(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    document = db.query(models.Document).filter(
-        models.Document.id == document_id,
-        models.Document.user_id == current_user.id,
-    ).first()
-
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    document, role = team_service.get_document(db, current_user, document_id)
 
     db_message = models.Message(
         document_id=document_id,
@@ -250,12 +246,7 @@ async def export_chat(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    document = db.query(models.Document).filter(
-        models.Document.id == document_id,
-        models.Document.user_id == current_user.id,
-    ).first()
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    document, role = team_service.get_document(db, current_user, document_id)
 
     messages = (
         db.query(models.Message)
@@ -295,13 +286,7 @@ async def get_messages(
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(get_current_user),
 ):
-    document = db.query(models.Document).filter(
-        models.Document.id == document_id,
-        models.Document.user_id == current_user.id,
-    ).first()
-
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    document, role = team_service.get_document(db, current_user, document_id)
 
     return (
         db.query(models.Message)

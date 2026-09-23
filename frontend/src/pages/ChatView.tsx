@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Send, Download, Share2, Maximize, X, ChevronDown, Edit, Bookmark, FileDown } from 'lucide-react';
+import { Send, Download, Share2, Maximize, X, ChevronDown, Edit, Bookmark, FileDown, MessageCircle } from 'lucide-react';
 import { usePdf } from '../context/PdfContext';
 import { useAuth } from '../context/AuthContext';
 import ChatMessage from '../components/ChatMessage';
 import PdfViewer from '../components/PdfViewer';
-import { askQuestion, saveMessage, fetchDocumentMessages, exportChat } from '../services/api';
-import { MessageType } from '../types';
+import CommentsPanel from '../components/CommentsPanel';
+import { askQuestion, saveMessage, fetchDocumentMessages, exportChat, getTeamPrompts } from '../services/api';
+import { MessageType, TeamPrompt } from '../types';
 import { Button } from '@/components/ui/button';
 
 import { Card, CardContent } from '@/components/ui/card';
@@ -32,7 +33,7 @@ const PROMPT_TEMPLATES = [
 const ChatView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { getDocumentById, updateDocument } = usePdf();
-  const { refreshUser } = useAuth();
+  const { refreshUser, team } = useAuth();
   const navigate = useNavigate();
   const document = getDocumentById(id || '');
 
@@ -43,10 +44,18 @@ const ChatView: React.FC = () => {
   const [messages, setMessages] = useState<MessageType[]>(document?.messages || []);
   const [currentPdfUrl, setCurrentPdfUrl] = useState<string | undefined>(undefined);
   const [isExporting, setIsExporting] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [openComments, setOpenComments] = useState(0);
+  const [teamPrompts, setTeamPrompts] = useState<TeamPrompt[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   
+  // Shared team prompts show up next to the built-in templates
+  useEffect(() => {
+    if (team) getTeamPrompts(team.id).then(setTeamPrompts).catch(() => {});
+  }, [team?.id]);
+
   // Handle key press for input
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -369,6 +378,16 @@ const ChatView: React.FC = () => {
                   <Button
                     variant="ghost"
                     size="sm"
+                    onClick={() => setShowComments((v) => !v)}
+                    className="h-8 px-2 text-xs gap-1 text-muted-foreground"
+                    title="Comments"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    Comments{openComments > 0 && ` (${openComments})`}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={handleExport}
                     disabled={isExporting || messages.length === 0}
                     className="h-8 px-2 text-xs gap-1 text-muted-foreground"
@@ -383,6 +402,8 @@ const ChatView: React.FC = () => {
                 </div>
               </div>
             </header>
+
+          {showComments && <CommentsPanel documentId={parseInt(document.id)} onCount={setOpenComments} />}
 
           {/* Chat Messages */}
           <div className="flex-1 bg-muted/10 overflow-hidden">
@@ -457,7 +478,7 @@ const ChatView: React.FC = () => {
               {/* Prompt template chips */}
               {messages.length === 0 && (
                 <div className="flex gap-1.5 flex-wrap mb-3">
-                  {PROMPT_TEMPLATES.map((t) => (
+                  {[...PROMPT_TEMPLATES, ...teamPrompts.map((p) => ({ label: p.title, prompt: p.prompt }))].map((t) => (
                     <button
                       key={t.label}
                       onClick={() => setMessage(t.prompt)}

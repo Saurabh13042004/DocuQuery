@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Check, Zap, Star, Crown, ArrowRight, Coins } from 'lucide-react';
+import { Check, Zap, Star, Crown, Users, ArrowRight, Coins } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '../context/AuthContext';
@@ -11,9 +11,10 @@ const PLAN_ICONS: Record<string, React.ReactNode> = {
   free: <Zap className="h-5 w-5" />,
   starter: <Star className="h-5 w-5" />,
   pro: <Crown className="h-5 w-5" />,
+  team: <Users className="h-5 w-5" />,
 };
 
-const PLAN_ORDER: PlanId[] = ['free', 'starter', 'pro'];
+const PLAN_ORDER: PlanId[] = ['free', 'starter', 'pro', 'team'];
 
 const REASON_LABELS: Record<string, string> = {
   signup_bonus: 'Signup bonus',
@@ -22,6 +23,8 @@ const REASON_LABELS: Record<string, string> = {
   edit: 'PDF edit',
   plan_upgrade_starter: 'Starter plan upgrade',
   plan_upgrade_pro: 'Pro plan upgrade',
+  plan_upgrade_team: 'Team plan upgrade',
+  team_seat: 'Team seat credits',
 };
 
 export default function PlansPage() {
@@ -95,7 +98,7 @@ export default function PlansPage() {
       )}
 
       {/* Plan cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {PLAN_ORDER.map((planId) => {
           const plan = plansData.plans[planId];
           if (!plan) return null;
@@ -140,7 +143,7 @@ export default function PlansPage() {
               {/* Credits */}
               <div className="text-sm text-muted-foreground">
                 {plan.monthly_credits > 0
-                  ? `${plan.monthly_credits.toLocaleString()} credits / month`
+                  ? `${plan.monthly_credits.toLocaleString()} credits / month${planId === 'team' ? ' / seat' : ''}`
                   : '50 credits one-time'}
               </div>
 

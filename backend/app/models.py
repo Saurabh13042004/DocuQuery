@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text
 from .database import Base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -29,6 +29,7 @@ class Document(Base):
     edited_file_path = Column(String, nullable=True)
     upload_date = Column(DateTime, default=datetime.utcnow)
     user_id = Column(Integer, ForeignKey("users.id"))
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)  # set = shared with that team
 
     user = relationship("User", back_populates="documents")
     messages = relationship("Message", back_populates="document")
@@ -56,3 +57,60 @@ class CreditTransaction(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="credit_transactions")
+
+
+class Team(Base):
+    __tablename__ = "teams"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class TeamMember(Base):
+    __tablename__ = "team_members"
+
+    id = Column(Integer, primary_key=True, index=True)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)  # one team per user
+    role = Column(String, nullable=False)  # owner | admin | editor | viewer
+
+    user = relationship("User")
+
+
+class TeamInvite(Base):
+    __tablename__ = "team_invites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
+    email = Column(String, nullable=False, index=True)
+    role = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    team = relationship("Team")
+
+
+class TeamPrompt(Base):
+    __tablename__ = "team_prompts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
+    title = Column(String, nullable=False)
+    prompt = Column(Text, nullable=False)
+    category = Column(String, nullable=False, default="General")  # HR | Legal | Finance | General
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    document_id = Column(Integer, ForeignKey("documents.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    content = Column(Text, nullable=False)
+    page = Column(Integer, nullable=True)
+    resolved = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
