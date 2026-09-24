@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from app.api.routes import router
 from app.api.teams import router as teams_router
@@ -7,9 +9,23 @@ from sqlalchemy import text
 
 app = FastAPI()
 
+
+def _cors_origins() -> list[str]:
+    """Local dev origins + FRONTEND_URL + any comma-separated CORS_ORIGINS."""
+    origins = {"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173"}
+    extra = [os.environ.get("FRONTEND_URL", "")] + os.environ.get("CORS_ORIGINS", "").split(",")
+    for value in extra:
+        value = value.strip().strip('"').rstrip("/")
+        if value:
+            origins.add(value)
+    return sorted(origins)
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins(),
+    # Vercel production alias + preview deployments of this project. Override with CORS_ORIGIN_REGEX.
+    allow_origin_regex=os.environ.get("CORS_ORIGIN_REGEX", r"https://docu-query[\w-]*\.vercel\.app"),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
