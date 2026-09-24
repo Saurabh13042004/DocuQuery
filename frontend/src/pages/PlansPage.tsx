@@ -19,6 +19,11 @@ const REASON_LABELS: Record<string, string> = {
   plan_upgrade_starter: 'Starter plan',
   plan_upgrade_pro: 'Pro plan',
   plan_upgrade_team: 'Team plan',
+  plan_switch_free: 'Switched to Free plan',
+  plan_set_free: 'Plan set to Free',
+  plan_set_starter: 'Plan set to Starter',
+  plan_set_pro: 'Plan set to Pro',
+  plan_set_team: 'Plan set to Team',
   team_seat: 'Team seat credits',
 };
 

@@ -135,6 +135,8 @@ def upgrade_plan(db: Session, user: models.User, new_plan: str) -> models.User:
     if monthly > 0:
         user.credits += monthly
         _log(db, user.id, monthly, f"plan_upgrade_{new_plan}")
+    else:
+        _log(db, user.id, 0, f"plan_switch_{new_plan}")  # keep a trail of plan changes that grant no credits
     db.commit()
     db.refresh(user)
     return user
