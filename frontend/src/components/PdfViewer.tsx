@@ -60,7 +60,8 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ document, customPdfUrl }) => {
     let objectUrl = '';
     let cancelled = false;
     setLoadFailed(false);
-    fetchDocumentFile(customPdfUrl ?? `/documents/${document.id}/file`)
+    // edited=true serves the latest edited version, or the original if it was never edited
+    fetchDocumentFile(customPdfUrl ?? `/documents/${document.id}/file?edited=true`)
       .then((blob) => {
         if (cancelled) return;
         objectUrl = URL.createObjectURL(blob);

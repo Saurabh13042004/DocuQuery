@@ -221,7 +221,7 @@ const ChatView: React.FC = () => {
 
     try {
       // Files are private: fetch the current version (edited or original) with auth, then save it
-      const blob = await fetchDocumentFile(currentPdfUrl || `/documents/${document.id}/file`);
+      const blob = await fetchDocumentFile(currentPdfUrl || `/documents/${document.id}/file?edited=true`);
       const url = URL.createObjectURL(blob);
       const a = window.document.createElement('a');
       a.href = url;
