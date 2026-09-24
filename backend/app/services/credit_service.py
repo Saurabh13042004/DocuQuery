@@ -1,142 +1,69 @@
-from datetime import datetime, timezone
+from __future__ import annotations
+
 from sqlalchemy.orm import Session
-from fastapi import HTTPException
-from .. import models
 
-SIGNUP_BONUS = 20
-
-# credits consumed per operation
-COSTS = {
-    "upload": 2,
-    "ask": 1,
-    "edit": 2,
-}
-
-PLANS: dict = {
-    "free": {
-        "name": "Free",
-        "price_usd": 0,
-        "monthly_credits": 0,
-        "badge_color": "secondary",
-        "description": "Perfect for getting started",
-        "features": [
-            f"{SIGNUP_BONUS} one-time credits (try it free)",
-            "PDF Q&A (1 credit)",
-            "PDF editing (2 credits)",
-            "Upload PDFs (2 credits)",
-            "Community support",
-        ],
-    },
-    "starter": {
-        "name": "Starter",
-        "price_usd": 9,
-        "monthly_credits": 500,
-        "badge_color": "default",
-        "description": "For individuals & small teams",
-        "features": [
-            "500 credits / month",
-            "PDF Q&A (1 credit)",
-            "PDF editing (2 credits)",
-            "Upload PDFs (2 credits)",
-            "Email support",
-        ],
-    },
-    "pro": {
-        "name": "Pro",
-        "price_usd": 29,
-        "monthly_credits": 2000,
-        "badge_color": "default",
-        "description": "For power users & growing teams",
-        "features": [
-            "2 000 credits / month",
-            "PDF Q&A (1 credit)",
-            "PDF editing (2 credits)",
-            "Upload PDFs (2 credits)",
-            "Priority support",
-            "API access",
-        ],
-    },
-    "team": {
-        "name": "Team",
-        "price_usd": 79,
-        "monthly_credits": 1500,
-        "seats": 5,
-        "badge_color": "default",
-        "description": "For teams collaborating on documents",
-        "features": [
-            "5 seats, 1 500 credits / seat",
-            "Shared document library",
-            "Roles: Admin / Editor / Viewer",
-            "Team usage dashboard",
-            "Shared prompts & comments",
-        ],
-    },
-}
+from app.core.exceptions import BadRequestError, InsufficientCreditsError
+from app.domain.enums import Operation, Plan
+from app.domain.plans import COSTS, PLANS, SIGNUP_BONUS
+from app.models import CreditTransaction, User
+from app.repositories.users import CreditRepository
 
 
-def _log(db: Session, user_id: int, amount: int, reason: str):
-    db.add(models.CreditTransaction(
-        user_id=user_id,
-        amount=amount,
-        reason=reason,
-        created_at=datetime.now(timezone.utc),
-    ))
+class CreditService:
+    def __init__(self, db: Session, credits: CreditRepository):
+        self.db = db
+        self.credits = credits
 
-
-def check_and_deduct(db: Session, user: models.User, operation: str) -> int:
-    """Verify the user can afford *operation*, deduct credits, persist, return remaining."""
-    cost = COSTS.get(operation, 1)
-    if user.credits < cost:
-        raise HTTPException(
-            status_code=402,
-            detail={
+    def check_and_deduct(self, user: User, operation: Operation) -> int:
+        """Charge for *operation* (or raise 402) and return the remaining balance."""
+        cost = COSTS[operation.value]
+        if user.credits < cost:
+            raise InsufficientCreditsError({
                 "error": "insufficient_credits",
                 "message": (
-                    f"Not enough credits. '{operation}' costs {cost} credit(s) "
+                    f"Not enough credits. '{operation.value}' costs {cost} credit(s) "
                     f"but you have {user.credits}."
                 ),
                 "credits_needed": cost,
                 "credits_available": user.credits,
                 "plan": user.plan,
-            },
-        )
-    user.credits -= cost
-    _log(db, user.id, -cost, operation)
-    db.commit()
-    db.refresh(user)
-    return user.credits
+            })
+        return self.add_credits(user, -cost, operation.value)
 
+    def refund(self, user: User, operation: Operation) -> int:
+        """Give back what *operation* cost, e.g. when the work failed through no fault of the user."""
+        return self.add_credits(user, COSTS[operation.value], f"{operation.value}_refund")
 
-def add_credits(db: Session, user: models.User, amount: int, reason: str) -> int:
-    """Add *amount* credits to *user* and log the transaction."""
-    user.credits += amount
-    _log(db, user.id, amount, reason)
-    db.commit()
-    db.refresh(user)
-    return user.credits
+    def add_credits(self, user: User, amount: int, reason: str) -> int:
+        user.credits += amount
+        self.credits.add_transaction(user.id, amount, reason)
+        self.db.commit()
+        self.db.refresh(user)
+        return user.credits
 
+    def grant_signup_bonus(self, user: User) -> None:
+        self.credits.add_transaction(user.id, SIGNUP_BONUS, "signup_bonus")
+        self.db.commit()
 
-def grant_signup_bonus(db: Session, user: models.User):
-    """Called once at registration."""
-    # credits=50 is already the column default; just log it
-    _log(db, user.id, SIGNUP_BONUS, "signup_bonus")
-    db.commit()
+    def change_plan(self, user: User, plan: Plan) -> User:
+        # NOTE: no payment yet. Wire Stripe in front of this before charging real money.
+        if plan.value == user.plan:
+            raise BadRequestError("Already on this plan")
+        user.plan = plan.value
+        monthly = PLANS[plan.value]["monthly_credits"]
+        if monthly > 0:
+            user.credits += monthly
+            self.credits.add_transaction(user.id, monthly, f"plan_upgrade_{plan.value}")
+        else:
+            # keep a trail of plan changes that grant no credits
+            self.credits.add_transaction(user.id, 0, f"plan_switch_{plan.value}")
+        self.db.commit()
+        self.db.refresh(user)
+        return user
 
+    def history(self, user: User, limit: int = 50) -> list[CreditTransaction]:
+        return self.credits.history(user.id, limit)
 
-def upgrade_plan(db: Session, user: models.User, new_plan: str) -> models.User:
-    if new_plan not in PLANS:
-        raise HTTPException(status_code=400, detail=f"Unknown plan '{new_plan}'")
-    if new_plan == user.plan:
-        raise HTTPException(status_code=400, detail="Already on this plan")
-
-    plan_info = PLANS[new_plan]
-    user.plan = new_plan
-    monthly = plan_info["monthly_credits"]
-    if monthly > 0:
-        user.credits += monthly
-        _log(db, user.id, monthly, f"plan_upgrade_{new_plan}")
-    else:
-        _log(db, user.id, 0, f"plan_switch_{new_plan}")  # keep a trail of plan changes that grant no credits
-    db.commit()
-    db.refresh(user)
-    return user
+    @staticmethod
+    def plans_overview(user: User) -> dict:
+        return {"plans": PLANS, "current_plan": user.plan, "credits": user.credits, "costs": COSTS}
