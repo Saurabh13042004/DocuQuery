@@ -1,7 +1,19 @@
-__pycache__
+# secrets & local state
+.env
+.env.*
+!.env.example
+*.db
+.git
+
+# python / tooling artefacts
+venv/
+.venv/
+__pycache__/
 *.pyc
 *.pyo
-.env
-test.db
+.pytest_cache/
+
+# not needed at runtime (tests run from the bind mount in docker compose)
+tests/
 pdfs/
 *.md

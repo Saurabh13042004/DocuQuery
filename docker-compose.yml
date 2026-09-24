@@ -1,6 +1,10 @@
 services:
   backend:
     build: ./backend
+    # Dev only: hot reload against the bind mount. The image itself runs without --reload.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # Root so the container can write (pytest cache, test DB) into the bind-mounted ./backend.
+    user: root
     ports:
       - "8000:8000"
     volumes:
@@ -9,6 +13,7 @@ services:
       - ./backend/.env
     environment:
       - ENVIRONMENT=development
+    restart: unless-stopped
 
   frontend:
     build: ./frontend
@@ -18,6 +23,9 @@ services:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000
+      # Read by the browser, so it must be reachable from your machine, not the Docker network.
+      - VITE_API_URL=http://localhost:8000
+    restart: unless-stopped

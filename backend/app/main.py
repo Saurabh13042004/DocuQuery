@@ -16,6 +16,11 @@ app.add_middleware(
 )
 
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 @app.on_event("startup")
 async def startup():
     # Create any missing tables (new installs + credit_transactions table)
