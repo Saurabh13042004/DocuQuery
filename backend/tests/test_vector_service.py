@@ -160,8 +160,8 @@ async def test_query_relevant_chunks_returns_joined_text(mock_vector_index, mock
     mock_vector_index.query.return_value = [r1, r2]
 
     result = await query_relevant_chunks(1, "What is this about?")
-    assert "First chunk" in result
-    assert "Second chunk" in result
+    assert "First chunk" in result["context"]
+    assert "Second chunk" in result["context"]
 
 
 @pytest.mark.asyncio
@@ -169,7 +169,7 @@ async def test_query_relevant_chunks_empty_returns_empty_string(mock_vector_inde
     from app.services.vector_service import query_relevant_chunks
     mock_vector_index.query.return_value = []
     result = await query_relevant_chunks(1, "anything")
-    assert result == ""
+    assert result == {"context": "", "pages": []}
 
 
 @pytest.mark.asyncio
@@ -180,3 +180,28 @@ async def test_delete_document_calls_index_delete(mock_vector_index):
     deleted_ids = mock_vector_index.delete.call_args[1]["ids"]
     assert "doc_5_chunk_0" in deleted_ids
     assert "doc_5_chunk_2" in deleted_ids
+
+
+# ── dense-only vs hybrid index ────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_dense_only_index_gets_no_sparse_vectors(mock_vector_index, mock_vector_openai):
+    """A dense-only Upstash index rejects sparse vectors, so none may be sent."""
+    from app.services.vector_service import index_document, query_relevant_chunks
+    mock_vector_index.info.return_value.sparse_index = None
+
+    await index_document(7, "alpha beta gamma")
+    assert all(v.sparse_vector is None for v in mock_vector_index.upsert.call_args[0][0])
+
+    await query_relevant_chunks(7, "alpha?")
+    assert mock_vector_index.query.call_args.kwargs["sparse_vector"] is None
+
+
+@pytest.mark.asyncio
+async def test_hybrid_index_still_gets_sparse_vectors(mock_vector_index, mock_vector_openai):
+    from app.services.vector_service import index_document, query_relevant_chunks
+    await index_document(7, "alpha beta gamma")
+    assert all(v.sparse_vector is not None for v in mock_vector_index.upsert.call_args[0][0])
+
+    await query_relevant_chunks(7, "alpha?")
+    assert mock_vector_index.query.call_args.kwargs["sparse_vector"] is not None

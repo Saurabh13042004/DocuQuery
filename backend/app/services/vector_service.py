@@ -24,6 +24,17 @@ TOP_K = 5               # top chunks to retrieve per query
 SPARSE_DIM = 50_000     # hash space for sparse term indices
 
 
+_hybrid: bool | None = None  # does the index accept sparse vectors? Looked up once.
+
+
+def _is_hybrid() -> bool:
+    """Hybrid (dense+sparse) indexes accept sparse vectors; dense-only ones reject them."""
+    global _hybrid
+    if _hybrid is None:
+        _hybrid = _index.info().sparse_index is not None
+    return _hybrid
+
+
 def _chunk_text(text: str) -> list[str]:
     words = text.split()
     chunks = []
@@ -97,11 +108,12 @@ async def index_document(document_id: int, text: str, pages: list[str] | None = 
         embeddings = await loop.run_in_executor(None, _embed_batch, chunks_only[i:i + EMBED_BATCH])
         all_embeddings.extend(embeddings)
 
+    hybrid = _is_hybrid()
     vectors = [
         Vector(
             id=f"doc_{document_id}_chunk_{i}",
             vector=embedding,
-            sparse_vector=_compute_sparse(chunk),
+            sparse_vector=_compute_sparse(chunk) if hybrid else None,
             metadata={
                 "document_id": document_id,
                 "chunk_index": i,
@@ -120,14 +132,14 @@ async def index_document(document_id: int, text: str, pages: list[str] | None = 
 
 
 async def query_relevant_chunks(document_id: int, question: str) -> dict:
-    """Hybrid query returning context text and source page numbers.
+    """Hybrid (dense-only if the index has no sparse side) query returning context text and source page numbers.
 
     Returns {"context": str, "pages": list[int]}.
     Context has [Page N] prefixes so the LLM can cite them naturally.
     """
     loop = asyncio.get_event_loop()
     dense = await loop.run_in_executor(None, _embed_single, question)
-    sparse = _compute_sparse(question)
+    sparse = _compute_sparse(question) if _is_hybrid() else None
 
     results = await loop.run_in_executor(
         None,

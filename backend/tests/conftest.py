@@ -78,6 +78,8 @@ def mock_redis():
 
 @pytest.fixture
 def mock_vector_index():
+    from app.services import vector_service
+    vector_service._hybrid = None  # the index type is looked up once; don't leak it between tests
     with patch("app.services.vector_service._index") as m:
         m.upsert.return_value = None
         m.query.return_value = []
